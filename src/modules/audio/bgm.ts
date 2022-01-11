@@ -49,7 +49,7 @@ class BGMPlayer {
 
     private _config = new Config({
         muted: false,
-        volume: 100
+        volume: 70
     });
 
     /**

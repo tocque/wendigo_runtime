@@ -90,12 +90,12 @@ class Resizer {
     /**
      * 获取用户设置的最大缩放比例的只读代理 
      */
-    getExecptRatio(): Ref<number>
+    getExpectRatio(): Ref<number>
 
     /**
      * 设置最大缩放比例
      */
-    setExecptRatio(ratio: number): void
+    setExpectRatio(ratio: number): void
 }
 ```
 

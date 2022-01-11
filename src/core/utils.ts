@@ -1,12 +1,11 @@
 /**
  * @module utils.ts 工具类
  * 
- * 
  */
 
-"use strict";
-
+import { addToClipboard } from "@/modules/client/clipboard";
 import { core } from "./core";
+import { decodeRoute, encodeRoute } from "./route";
 
 export class Utils {
 
@@ -431,34 +430,51 @@ export class Utils {
             localforage.length(callback);
         }
     }
-    setGlobal(key, value) {
-        if (core.isReplaying())
-            return;
-        core.setLocalStorage(key, value);
+    
+    /**
+     * 设置一个全局存储，适用于global:xxx，录像播放时将忽略此函数。
+     * @deprecated
+     * @example core.setBlobal('一周目已通关', true); // 设置全局存储“一周目已通关”为true，方便二周目游戏中的新要素。
+     * @param key 全局变量名称，支持中文
+     * @param value 全局变量的新值，不填或null表示清除此全局存储
+     */
+    setGlobal(key: string, value?: any) {
+        // if (core.isReplaying())
+        //     return;
+        // core.setLocalStorage(key, value);
     }
-    getGlobal(key, defaultValue) {
-        var value;
-        if (core.isReplaying()) {
-            // 不考虑key不一致的情况
-            var action = core.status.replay.toReplay.shift();
-            if (action.indexOf("input2:") == 0) {
-                value = JSON.parse(core.decodeBase64(action.substring(7)));
-                core.setFlag('__global__' + key, value);
-                core.status.route.push("input2:" + core.encodeBase64(JSON.stringify(value)));
-            }
-            else {
-                // 录像兼容性：尝试从flag和localStorage获得
-                // 注意这里不再二次记录 input2: 到录像
-                core.status.replay.toReplay.unshift(action);
-                value = core.getFlag('__global__' + key, core.getLocalStorage(key, defaultValue));
-            }
-        }
-        else {
-            value = core.getLocalStorage(key, defaultValue);
-            core.setFlag('__global__' + key, value);
-            core.status.route.push("input2:" + core.encodeBase64(JSON.stringify(value)));
-        }
-        return value;
+    
+    /**
+     * 读取一个全局存储，适用于global:xxx，支持录像。
+     * @deprecated
+     * @example if (core.getGlobal('一周目已通关', false) === true) core.getItem('dagger'); // 二周目游戏进行到此处时会获得一把屠龙匕首
+     * @param key 全局变量名称，支持中文
+     * @param defaultValue 可选，当此全局变量不存在或值为null、undefined时，用此值代替
+     * @returns 全局变量的值
+     */
+    getGlobal(key: string, defaultValue?: any) {
+        // var value;
+        // if (core.isReplaying()) {
+        //     // 不考虑key不一致的情况
+        //     var action = core.status.replay.toReplay.shift();
+        //     if (action.indexOf("input2:") == 0) {
+        //         value = JSON.parse(core.decodeBase64(action.substring(7)));
+        //         core.setFlag('__global__' + key, value);
+        //         core.status.route.push("input2:" + core.encodeBase64(JSON.stringify(value)));
+        //     }
+        //     else {
+        //         // 录像兼容性：尝试从flag和localStorage获得
+        //         // 注意这里不再二次记录 input2: 到录像
+        //         core.status.replay.toReplay.unshift(action);
+        //         value = core.getFlag('__global__' + key, core.getLocalStorage(key, defaultValue));
+        //     }
+        // }
+        // else {
+        //     value = core.getLocalStorage(key, defaultValue);
+        //     core.setFlag('__global__' + key, value);
+        //     core.status.route.push("input2:" + core.encodeBase64(JSON.stringify(value)));
+        // }
+        // return value;
     }
     
     /**
@@ -482,9 +498,11 @@ export class Utils {
         }
         // array
         if (data instanceof Array) {
+            // @ts-ignore
             var copy = [];
             for (var i in data) {
                 if (!filter || filter(i, data[i]))
+                    // @ts-ignore
                     copy[i] = core.clone(data[i], recursion ? filter : null, recursion);
             }
             return copy;
@@ -495,9 +513,13 @@ export class Utils {
         }
         // object
         if (data instanceof Object) {
+            // @ts-ignore
             var copy = {};
+            // @ts-ignore
             for (var i in data) {
+                // @ts-ignore
                 if (data.hasOwnProperty(i) && (!filter || filter(i, data[i])))
+                // @ts-ignore
                     copy[i] = core.clone(data[i], recursion ? filter : null, recursion);
             }
             return copy;
@@ -505,7 +527,7 @@ export class Utils {
         return data;
     }
     ////// 深拷贝1D/2D数组优化 //////
-    cloneArray(data) {
+    cloneArray(data: any[]) {
         if (!(data instanceof Array))
             return this.clone(data);
         if (data[0] instanceof Array) {
@@ -514,16 +536,20 @@ export class Utils {
             return data.slice();
         }
     }
-    ////// 裁剪图片 //////
-    splitImage(image, width, height) {
+    
+    /**
+     * 等比例切分一张图片
+     * @example core.splitImage(core.material.images.images['npc48.png'], 32, 48); // 把npc48.png切分成若干32×48px的小人
+     * @param image 图片名（支持映射前的中文名）或图片对象（参见上面的例子），获取不到时返回[]
+     * @param width 子图的宽度，单位为像素。原图总宽度必须是其倍数，不填视为32
+     * @param height 子图的高度，单位为像素。原图总高度必须是其倍数，不填视为正方形
+     * @returns 子图组成的数组，在原图中呈先行后列，从左到右、从上到下排列。
+     */
+    splitImage(image: string | HTMLImageElement, width = 32, height = width): HTMLImageElement[] {
         if (typeof image == "string") {
             image = core.getMappedName(image);
             image = core.material.images.images[image];
         }
-        if (!image)
-            return [];
-        width = width || 32;
-        height = height || width;
         var canvas = document.createElement("canvas");
         var ctx = canvas.getContext("2d");
         var ans = [];
@@ -539,30 +565,38 @@ export class Utils {
         }
         return ans;
     }
-    ////// 格式化时间为字符串 //////
-    formatDate(date) {
+
+    /** 格式化日期为字符串 */
+    formatDate(date: Date) {
         if (!date)
             date = new Date();
         return "" + date.getFullYear() + "-" + core.setTwoDigits(date.getMonth() + 1) + "-" + core.setTwoDigits(date.getDate()) + " "
             + core.setTwoDigits(date.getHours()) + ":" + core.setTwoDigits(date.getMinutes()) + ":" + core.setTwoDigits(date.getSeconds());
     }
-    ////// 格式化时间为最简字符串 //////
-    formatDate2(date) {
+
+    /** 格式化日期为最简字符串 */
+    formatDate2(date: Date) {
         if (!date)
             date = new Date();
         return "" + date.getFullYear() + core.setTwoDigits(date.getMonth() + 1) + core.setTwoDigits(date.getDate())
             + core.setTwoDigits(date.getHours()) + core.setTwoDigits(date.getMinutes()) + core.setTwoDigits(date.getSeconds());
     }
-    formatTime(time) {
-        return core.setTwoDigits(parseInt(time / 3600000))
-            + ":" + core.setTwoDigits(parseInt(time / 60000) % 60)
-            + ":" + core.setTwoDigits(parseInt(time / 1000) % 60);
+    
+    /** 格式化时间 */
+    formatTime(time: number) {
+        return core.setTwoDigits(~~(time / 3600000))
+            + ":" + core.setTwoDigits(~~(time / 60000) % 60)
+            + ":" + core.setTwoDigits(~~(time / 1000) % 60);
     }
-    ////// 两位数显示 //////
-    setTwoDigits(x) {
-        return (parseInt(x) < 10 && parseInt(x) >= 0) ? "0" + x : x;
+
+    /** 两位数显示 */
+    setTwoDigits(x: number) {
+        x = ~~x;
+        return (x < 10 && x >= 0) ? "0" + x : x;
     }
-    formatSize(size) {
+    
+    /** 格式化文件大小 */
+    formatSize(size: number) {
         if (size < 1024)
             return size + 'B';
         else if (size < 1024 * 1024)
@@ -570,12 +604,18 @@ export class Utils {
         else
             return (size / 1024 / 1024).toFixed(2) + "MB";
     }
-    formatBigNumber(x, digits) {
-        if (digits === true)
-            digits = 5; // 兼容旧版onMap参数
+
+    /**
+     * 大数字格式化，单位为10000的倍数（w,e,z,j,g），末尾四舍五入
+     * @example core.formatBigNumber(123456789, false); // "12346w"
+     * @param x 原数字
+     * @param digits 
+     * @returns 格式化结果
+     */
+    formatBigNumber(x: number, digits = 6) {
         if (!digits || digits < 5)
             digits = 6; // 连同负号、小数点和后缀字母在内的总位数，至少需为5，默认为6
-        x = Math.trunc(parseFloat(x)); // 尝试识别为小数，然后向0取整
+        x = Math.trunc(x); // 尝试识别为小数，然后向0取整
         if (x == null || !Number.isFinite(x))
             return '???'; // 无法识别的数或正负无穷大，显示'???'
         var units = [
@@ -605,9 +645,10 @@ export class Utils {
         }
         return sign + x.toExponential(0);
     }
-    ////// 变速移动 //////
-    applyEasing(name) {
-        var list = {
+
+    /** 变速移动 */
+    applyEasing(name = "linear"): (number: number) => number {
+        var list: Record<string, (number: number) => number> = {
             "easeIn": function (t) {
                 return Math.pow(t, 3);
             },
@@ -629,253 +670,66 @@ export class Utils {
             var keys = Object.keys(list);
             name = keys[Math.floor(Math.random() * keys.length)];
         }
-        return list[name] || list.linear;
+        return list[name] ?? list.linear;
     }
-    ////// 数组转RGB //////
-    arrayToRGB(color) {
+    
+    /**
+     * 颜色数组转十六进制
+     * @example core.arrayToRGB([102, 204, 255]); // "#66ccff"，加载画面的宣传色
+     * @param color 一行三列的数组，各元素必须为不大于255的自然数
+     * @returns 该颜色的十六进制表示，使用小写字母
+     */
+    arrayToRGB(color: [number, number, number]) {
         if (!(color instanceof Array))
             return color;
-        var nowR = this.clamp(parseInt(color[0]), 0, 255), nowG = this.clamp(parseInt(color[1]), 0, 255), nowB = this.clamp(parseInt(color[2]), 0, 255);
+        var nowR = this.clamp(~~(color[0]), 0, 255), nowG = this.clamp(~~(color[1]), 0, 255), nowB = this.clamp(~~(color[2]), 0, 255);
         return "#" + ((1 << 24) + (nowR << 16) + (nowG << 8) + nowB).toString(16).slice(1);
     }
-    arrayToRGBA(color) {
+    
+    /**
+     * 颜色数组转字符串
+     * @example core.arrayToRGBA([102, 204, 255]); // "rgba(102,204,255,1)"
+     * @param color 一行三列或一行四列的数组，前三个元素必须为不大于255的自然数。第四个元素（如果有）必须为0或不大于1的数字，第四个元素不填视为1
+     * @returns 该颜色的字符串表示
+     */
+    arrayToRGBA(color: [number, number, number, number]) {
         if (!(color instanceof Array))
             return color;
         if (color[3] == null)
             color[3] = 1;
-        var nowR = this.clamp(parseInt(color[0]), 0, 255), nowG = this.clamp(parseInt(color[1]), 0, 255), nowB = this.clamp(parseInt(color[2]), 0, 255), nowA = this.clamp(parseFloat(color[3]), 0, 1);
+        var nowR = this.clamp(~~(color[0]), 0, 255), nowG = this.clamp(~~(color[1]), 0, 255), nowB = this.clamp(~~(color[2]), 0, 255), nowA = this.clamp((color[3]), 0, 1);
         return "rgba(" + nowR + "," + nowG + "," + nowB + "," + nowA + ")";
     }
-    ////// 加密路线 //////
-    encodeRoute(route) {
-        var ans = "", lastMove = "", cnt = 0;
 
-        route.forEach(function (t) {
-            if (t == 'up' || t == 'down' || t == 'left' || t == 'right') {
-                if (t != lastMove && cnt > 0) {
-                    ans += lastMove.substring(0, 1).toUpperCase();
-                    if (cnt > 1)
-                        ans += cnt;
-                    cnt = 0;
-                }
-                lastMove = t;
-                cnt++;
-            }
-            else {
-                if (cnt > 0) {
-                    ans += lastMove.substring(0, 1).toUpperCase();
-                    if (cnt > 1)
-                        ans += cnt;
-                    cnt = 0;
-                }
-                ans += core.utils._encodeRoute_encodeOne(t);
-            }
-        });
-        if (cnt > 0) {
-            ans += lastMove.substring(0, 1).toUpperCase();
-            if (cnt > 1)
-                ans += cnt;
-        }
-        return LZString.compressToBase64(ans);
-    }
-    _encodeRoute_id2number(id) {
-        var number = core.maps.getNumberById(id);
-        return number == 0 ? id : number;
-    }
-    _encodeRoute_encodeOne(t) {
-        if (t.indexOf('item:') == 0)
-            return "I" + this._encodeRoute_id2number(t.substring(5)) + ":";
-        else if (t.indexOf('unEquip:') == 0)
-            return "u" + t.substring(8);
-        else if (t.indexOf('equip:') == 0)
-            return "e" + this._encodeRoute_id2number(t.substring(6)) + ":";
-        else if (t.indexOf('saveEquip:') == 0)
-            return "s" + t.substring(10);
-        else if (t.indexOf('loadEquip:') == 0)
-            return "l" + t.substring(10);
-        else if (t.indexOf('fly:') == 0)
-            return "F" + t.substring(4) + ":";
-        else if (t == 'choices:none')
-            return "c";
-        else if (t.indexOf('choices:') == 0)
-            return "C" + t.substring(8);
-        else if (t.indexOf('shop:') == 0)
-            return "S" + t.substring(5) + ":";
-        else if (t == 'turn')
-            return 'T';
-        else if (t.indexOf('turn:') == 0)
-            return "t" + t.substring(5).substring(0, 1).toUpperCase() + ":";
-        else if (t == 'getNext')
-            return 'G';
-        else if (t == 'input:none')
-            return 'p';
-        else if (t.indexOf('input:') == 0)
-            return "P" + t.substring(6);
-        else if (t.indexOf('input2:') == 0)
-            return "Q" + t.substring(7) + ":";
-        else if (t == 'no')
-            return 'N';
-        else if (t.indexOf('move:') == 0)
-            return "M" + t.substring(5);
-        else if (t.indexOf('key:') == 0)
-            return 'K' + t.substring(4);
-        else if (t.indexOf('click:') == 0)
-            return 'k' + t.substring(6);
-        else if (t.indexOf('random:') == 0)
-            return 'X' + t.substring(7);
-        return '(' + t + ')';
-    }
-    ////// 解密路线 //////
-    decodeRoute(route) {
-        if (!route)
-            return route;
+    /**
+     * 加密路线
+     */
+    encoderoute = encodeRoute;
 
-        // 解压缩
-        try {
-            var v = LZString.decompressFromBase64(route);
-            if (v != null && /^[-_a-zA-Z0-9+\/=:()]*$/.test(v)) {
-                if (v != "" || route.length < 8)
-                    route = v;
-            }
-        } catch (e) {
-        }
+    /**
+     * 解密路线
+     */
+    decodeRoute = decodeRoute;
 
-        var decodeObj = { route: route, index: 0, ans: [] };
-        while (decodeObj.index < decodeObj.route.length) {
-            this._decodeRoute_decodeOne(decodeObj, decodeObj.route.charAt(decodeObj.index++));
-        }
-        return decodeObj.ans;
-    }
-    _decodeRoute_getNumber(decodeObj, noparse) {
-        var num = "";
-        var first = true;
-        while (true) {
-            var ch = decodeObj.route.charAt(decodeObj.index);
-            if (ch >= '0' && ch <= '9')
-                num += ch;
-            else if (ch == '-' && first)
-                num += ch;
-            else
-                break;
-            first = false;
-            decodeObj.index++;
-        }
-        if (num.length == 0)
-            num = "1";
-        return noparse ? num : parseInt(num);
-    }
-    _decodeRoute_getString(decodeObj) {
-        var str = "";
-        while (decodeObj.index < decodeObj.route.length && decodeObj.route.charAt(decodeObj.index) != ':') {
-            str += decodeObj.route.charAt(decodeObj.index++);
-        }
-        decodeObj.index++;
-        return str;
-    }
-    _decodeRoute_number2id(number) {
-        if (/^\d+$/.test(number)) {
-            var info = core.maps.blocksInfo[number];
-            if (info)
-                return info.id;
-        }
-        return number;
-    }
-    _decodeRoute_decodeOne(decodeObj, c) {
-        // --- 特殊处理自定义项
-        if (c == '(') {
-            var idx = decodeObj.route.indexOf(')', decodeObj.index);
-            if (idx >= 0) {
-                decodeObj.ans.push(decodeObj.route.substring(decodeObj.index, idx));
-                decodeObj.index = idx + 1;
-                return;
-            }
-        }
-        var nxt = (c == 'I' || c == 'e' || c == 'F' || c == 'S' || c == 'Q' || c == 't') ?
-            this._decodeRoute_getString(decodeObj) : this._decodeRoute_getNumber(decodeObj);
-
-        var mp = { "U": "up", "D": "down", "L": "left", "R": "right" };
-
-        switch (c) {
-            case "U":
-            case "D":
-            case "L":
-            case "R":
-                for (var i = 0; i < nxt; i++)
-                    decodeObj.ans.push(mp[c]);
-                break;
-            case "I":
-                decodeObj.ans.push("item:" + this._decodeRoute_number2id(nxt));
-                break;
-            case "u":
-                decodeObj.ans.push("unEquip:" + nxt);
-                break;
-            case "e":
-                decodeObj.ans.push("equip:" + this._decodeRoute_number2id(nxt));
-                break;
-            case "s":
-                decodeObj.ans.push("saveEquip:" + nxt);
-                break;
-            case "l":
-                decodeObj.ans.push("loadEquip:" + nxt);
-                break;
-            case "F":
-                decodeObj.ans.push("fly:" + nxt);
-                break;
-            case 'c':
-                decodeObj.ans.push('choices:none');
-                break;
-            case "C":
-                decodeObj.ans.push("choices:" + nxt);
-                break;
-            case "S":
-                decodeObj.ans.push("shop:" + nxt);
-                break;
-            case "T":
-                decodeObj.ans.push("turn");
-                break;
-            case "t":
-                decodeObj.ans.push("turn:" + mp[nxt]);
-                break;
-            case "G":
-                decodeObj.ans.push("getNext");
-                break;
-            case "p":
-                decodeObj.ans.push("input:none");
-                break;
-            case "P":
-                decodeObj.ans.push("input:" + nxt);
-                break;
-            case "Q":
-                decodeObj.ans.push("input2:" + nxt);
-                break;
-            case "N":
-                decodeObj.ans.push("no");
-                break;
-            case "M":
-                ++decodeObj.index;
-                decodeObj.ans.push("move:" + nxt + ":" + this._decodeRoute_getNumber(decodeObj));
-                break;
-            case "K":
-                decodeObj.ans.push("key:" + nxt);
-                break;
-            case "k":
-                ++decodeObj.index;
-                var px = this._decodeRoute_getNumber(decodeObj);
-                ++decodeObj.index;
-                var py = this._decodeRoute_getNumber(decodeObj);
-                decodeObj.ans.push("click:" + nxt + ":" + px + ":" + py);
-                break;
-            case "X":
-                decodeObj.ans.push("random:" + nxt);
-                break;
-        }
-    }
-    ////// 判断某对象是否不为null也不为NaN //////
-    isset(val) {
+    /**
+     * 判断一个值是否不为null，undefined和NaN
+     * @example core.isset(0/0); // false，因为0/0等于NaN
+     * @param val 待测值，可选
+     * @returns false表示待测值为null、undefined、NaN或未填写，true表示为其他值。即!(v == null || v != v)
+     */
+    isset(val?: any) {
         return val != null && !(typeof val == 'number' && isNaN(val));
     }
-    ////// 获得子数组 //////
-    subarray(a, b) {
+
+    /**
+     * 判定一个数组是否为另一个数组的前缀，用于录像接续播放。请注意函数名没有大写字母
+     * @deprecated
+     * @example core.subarray(['ad', '米库', '小精灵', '小破草', '小艾'], ['ad', '米库', '小精灵']); // ['小破草', '小艾']
+     * @param a 可能的母数组，不填或比b短将返回null
+     * @param b 可能的前缀，不填或比a长将返回null
+     * @returns 如果b不是a的前缀将返回null，否则将返回a去掉此前缀后的剩余数组
+     */
+     subarray(a?: any[], b?: any[]): any[] | null {
         if (!(a instanceof Array) || !(b instanceof Array) || a.length < b.length)
             return null;
         for (var i = 0; i < b.length; ++i) {
@@ -884,45 +738,49 @@ export class Utils {
         }
         return a.slice(b.length);
     }
-    inArray(array, element) {
+    
+    /**
+     * 判定array是不是一个数组，以及element是否在该数组中。
+     * @deprecated
+     * @param array 可能的数组，不为数组或不填将导致返回值为false
+     * @param element 待查找的元素
+     * @returns 如果array为数组且具有element这项，就返回true，否则返回false
+     */
+    inArray(array?: any, element?: any) {
         return (array instanceof Array) && array.indexOf(element) >= 0;
     }
-    clamp(x, a, b) {
+    
+    /**
+     * 将x限定在[a,b]区间内，注意a和b可交换
+     * @example core.clamp(1200, 1, 1000); // 1000
+     * @param x 原始值，!x为true时x一律视为0
+     * @param a 下限值，大于b将导致与b交换
+     * @param b 上限值，小于a将导致与a交换
+     */
+    clamp(x: number, a: number, b: number): number {
         var min = Math.min(a, b), max = Math.max(a, b);
         return Math.min(Math.max(x || 0, min), max);
     }
-    getCookie(name) {
+
+    /**
+     * 访问浏览器cookie
+     */
+    getCookie(name: string) {
         var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
         return match ? match[2] : null;
     }
-    ////// 设置statusBar的innerHTML，会自动斜体和放缩，也可以增加自定义css //////
-    setStatusBarInnerHTML(name, value, css) {
-        if (!core.statusBar[name])
-            return;
-        if (typeof value == 'number')
-            value = this.formatBigNumber(value);
-        var italic = /^[-a-zA-Z0-9`~!@#$%^&*()_=+\[{\]}\\|;:'",<.>\/?]*$/.test(value);
-        var style = 'font-style: ' + (italic ? 'italic' : 'normal') + '; ';
-        style += 'text-shadow: #000 1px 0 0, #000 0 1px 0, #000 -1px 0 0, #000 0 -1px 0; ';
-        // 判定是否需要缩放
-        var length = this.strlen(value) || 1;
-        style += 'font-size: ' + Math.min(1, 7 / length) + 'em; ';
-        if (css)
-            style += css;
-        var _style = core.statusBar[name].getAttribute('_style');
-        var _value = core.statusBar[name].getAttribute('_value');
-        if (_style == style) {
-            if (value == _value)
-                return;
-            core.statusBar[name].children[0].innerText = value;
-        } else {
-            core.statusBar[name].innerHTML = "<span class='_status' style='" + style + "'></span>";
-            core.statusBar[name].children[0].innerText = value;
-            core.statusBar[name].setAttribute('_style', style);
-        }
-        core.statusBar[name].setAttribute('_value', value);;
+    /**
+     * 填写非自绘状态栏
+     * @deprecated
+     * @example core.setStatusBarInnerHTML('hp', core.status.hero.hp, 'color: #66CCFF'); // 更新状态栏中的主角生命，使用加载画面的宣传色
+     * @param name 状态栏项的名称，如'hp', 'atk', 'def'等。必须是core.statusBar中的一个合法项
+     * @param value 要填写的内容，大数字会被格式化为至多6个字符，无中文的内容会被自动设为斜体
+     * @param css 额外的css样式，可选。如更改颜色等
+     */
+    setStatusBarInnerHTML(name: string, value: any, css?: string) {
+        // 弃用
     }
-    strlen(str) {
+    strlen(str: string) {
         var count = 0;
         for (var i = 0, len = str.length; i < len; i++) {
             count += str.charCodeAt(i) < 256 ? 1 : 2;
@@ -953,7 +811,15 @@ export class Utils {
             return direction;
         return directionList[(index + (turn || 0)) % directionList.length];
     }
-    matchWildcard(pattern, string) {
+    
+    /**
+     * 通配符匹配，用于搜索图块等批量处理。
+     * @example core.playSound(core.matchWildcard('*Key', itemId) ? 'item.mp3' : 'door.mp3'); // 判断捡到的是钥匙还是别的道具，从而播放不同的音效
+     * @param pattern 模式串，每个星号表示任意多个（0个起）字符
+     * @param string 待测串
+     * @returns true表示匹配成功，false表示匹配失败
+     */
+    matchWildcard(pattern: string, string: string) {
         try {
             return new RegExp('^' + pattern.split(/\*+/).map(function (s) {
                 return s.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
@@ -962,7 +828,8 @@ export class Utils {
             return false;
         }
     }
-    matchRegex(pattern, string) {
+    /** 是否满足正则表达式 */
+    matchRegex(pattern: string, string: string) {
         try {
             if (pattern.startsWith("^"))
                 pattern = pattern.substring(1);
@@ -974,18 +841,18 @@ export class Utils {
         }
     }
     ////// Base64加密 //////
-    encodeBase64(str) {
+    encodeBase64(str: string) {
         return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1) {
             return String.fromCharCode(parseInt(p1, 16));
         }));
     }
     ////// Base64解密 //////
-    decodeBase64(str) {
+    decodeBase64(str: string) {
         return decodeURIComponent(atob(str).split('').map(function (c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
     }
-    rand(num) {
+    rand(num: number) {
         var rand = core.getFlag('__rand__');
         rand = this.__next_rand(rand);
         core.setFlag('__rand__', rand);
@@ -995,7 +862,7 @@ export class Utils {
         return ans;
     }
     ////// 生成随机数（录像方法） //////
-    rand2(num) {
+    rand2(num: number) {
         num = num || 2147483648;
         num = Math.abs(num);
 
@@ -1008,8 +875,7 @@ export class Utils {
                     console.warn('错误！当前random:项超过范围。将重新随机生成！');
                     value = Math.floor(Math.random() * num);
                 }
-            }
-            else {
+            } else {
                 console.warn('错误！当前需要一个random:项。将重新随机生成！');
                 value = Math.floor(Math.random() * num);
             }
@@ -1028,18 +894,20 @@ export class Utils {
         core.setFlag('__seed__', rand);
         core.setFlag('__rand__', rand);
     }
-    __next_rand(_rand) {
+    __next_rand(_rand: number) {
         _rand = (_rand % 127773) * 16807 - ~~(_rand / 127773) * 2836;
         _rand += _rand < 0 ? 2147483647 : 0;
         return _rand;
     }
     ////// 读取一个本地文件内容 //////
-    readFile(success, error, accept, readType) {
+    readFile(success: () => void, error, accept, readType) {
 
         core.platform.successCallback = success;
         core.platform.errorCallback = error;
 
+        // @ts-ignore
         if (window.jsinterface) {
+            // @ts-ignore
             window.jsinterface.readFile();
             return;
         }
@@ -1114,9 +982,11 @@ export class Utils {
             core.platform.errorCallback();
     }
     ////// 下载文件到本地 //////
-    download(filename, content) {
+    download(filename: string, content: string) {
 
+        // @ts-ignore
         if (window.jsinterface) {
+            // @ts-ignore
             window.jsinterface.download(filename, content);
             return;
         }
@@ -1129,10 +999,9 @@ export class Utils {
 
         // Step 1: 如果是iOS平台，直接不支持
         if (core.platform.isIOS) {
-            if (core.copy(content)) {
+            if (addToClipboard(content)) {
                 alert("iOS平台下不支持直接下载文件！\n所有应下载内容已经复制到您的剪切板，请自行创建空白文件并粘贴。");
-            }
-            else {
+            } else {
                 alert("iOS平台下不支持下载操作！");
             }
             return;
@@ -1141,7 +1010,7 @@ export class Utils {
         // Step 2: 如果不是PC平台（Android），则只支持chrome
         if (!core.platform.isPC) {
             if (!core.platform.isChrome || core.platform.isQQ || core.platform.isWeChat) { // 检测chrome
-                if (core.copy(content)) {
+                if (addToClipboard(content)) {
                     alert("移动端只有Chrome浏览器支持直接下载文件！\n所有应下载内容已经复制到您的剪切板，请自行创建空白文件并粘贴。");
                 }
                 else {
@@ -1163,10 +1032,11 @@ export class Utils {
 
         // Step 4: 下载
         var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        // @ts-ignore
         if (window.navigator.msSaveOrOpenBlob) {
+            // @ts-ignore
             window.navigator.msSaveBlob(blob, filename);
-        }
-        else {
+        } else {
             var href = window.URL.createObjectURL(blob);
             var elem = window.document.createElement('a');
             elem.href = href;
@@ -1177,110 +1047,42 @@ export class Utils {
             window.URL.revokeObjectURL(href);
         }
     }
-    ////// 复制一段内容到剪切板 //////
-    copy(data) {
-
-        if (window.jsinterface) {
-            window.jsinterface.copy(data);
-            return true;
-        }
-
-        if (!core.platform.supportCopy)
-            return false;
-
-        var textArea = document.createElement("textarea");
-        textArea.style.position = 'fixed';
-        textArea.style.top = 0;
-        textArea.style.left = 0;
-        textArea.style.width = '2em';
-        textArea.style.height = '2em';
-        textArea.style.padding = 0;
-        textArea.style.border = 'none';
-        textArea.style.outline = 'none';
-        textArea.style.boxShadow = 'none';
-        textArea.style.background = 'transparent';
-        textArea.value = data;
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.setSelectionRange(0, textArea.value.length);
-        var successful = false;
-        try {
-            successful = document.execCommand('copy');
-        } catch (err) {
-            successful = false;
-        }
-
-        document.body.removeChild(textArea);
-        return successful;
+    /**
+     * 复制一段内容到剪切板
+     * @param data 
+     */
+    copy(data: string) {
+        addToClipboard(data);
     }
-    ////// 显示一段confirm //////
-    myconfirm(hint, yesCallback, noCallback) {
-        main.dom.inputDiv.style.display = 'block';
-        main.dom.inputMessage.innerHTML = hint.replace(/\n/g, '<br/>');
-        main.dom.inputBox.style.display = 'none';
-        main.dom.inputYes.blur();
-        main.dom.inputNo.blur();
-        core.status.holdingKeys = [];
 
-        core.platform.successCallback = yesCallback;
-        core.platform.errorCallback = noCallback;
-    }
-    ////// 让用户输入一段文字 //////
-    myprompt(hint, value, callback) {
-        main.dom.inputDiv.style.display = 'block';
-        main.dom.inputMessage.innerHTML = hint.replace(/\n/g, '<br/>');
-        main.dom.inputBox.style.display = 'block';
-        main.dom.inputBox.value = value == null ? "" : value;
-        main.dom.inputYes.blur();
-        main.dom.inputNo.blur();
-        setTimeout(function () {
-            main.dom.inputBox.focus();
-        });
-        core.status.holdingKeys = [];
+    /**
+     * 显示确认框，类似core.drawConfirmBox()
+     * @example core.myconfirm('重启游戏？', core.restart); // 弹窗询问玩家是否重启游戏
+     * @param hint 弹窗的内容
+     * @param yesCallback 确定后的回调函数
+     * @param noCallback 取消后的回调函数，可选
+     */
+    myconfirm(hint: string, yesCallback: () => void, noCallback?: () => void) {
 
-        core.platform.successCallback = core.platform.errorCallback = callback;
     }
+
+    /**
+     * 让用户输入一段文字
+     * @param hint 
+     * @param value 
+     * @param callback 
+     */
+    myprompt(hint: string, value: string, callback: (value: string) => void) {
+
+    }
+
     ////// 动画显示某对象 //////
-    showWithAnimate(obj, speed, callback) {
-        obj.style.display = 'block';
-        if (!speed || main.mode != 'play') {
-            obj.style.opacity = 1;
-            if (callback)
-                callback();
-            return;
-        }
-        obj.style.opacity = 0;
-        var opacityVal = 0;
-        var showAnimate = window.setInterval(function () {
-            opacityVal += 0.03;
-            obj.style.opacity = opacityVal;
-            if (opacityVal > 1) {
-                clearInterval(showAnimate);
-                if (callback)
-                    callback();
-            }
-        }, speed);
+    showWithAnimate(obj: HTMLElement, speed: number, callback: () => void) {
+        //
     }
     ////// 动画使某对象消失 //////
-    hideWithAnimate(obj, speed, callback) {
-        if (!speed || main.mode != 'play') {
-            obj.style.display = 'none';
-            if (callback)
-                callback();
-            return;
-        }
-        obj.style.opacity = 1;
-        var opacityVal = 1;
-        var hideAnimate = window.setInterval(function () {
-            opacityVal -= 0.03;
-            obj.style.opacity = opacityVal;
-            if (opacityVal < 0) {
-                obj.style.display = 'none';
-                clearInterval(hideAnimate);
-                if (callback)
-                    callback();
-            }
-        }, speed);
+    hideWithAnimate(obj: HTMLElement, speed: number, callback: () => void) {
+        //
     }
     ////// 生成浏览器唯一的 guid //////
     getGuid() {
@@ -1294,7 +1096,8 @@ export class Utils {
         localStorage.setItem('guid', guid);
         return guid;
     }
-    hashCode(obj) {
+
+    hashCode(obj: any): number {
         if (typeof obj == 'string') {
             var hash = 0, i, chr;
             if (obj.length === 0)
@@ -1315,7 +1118,7 @@ export class Utils {
      * @param b 
      * @returns 
      */
-    same(a, b) {
+    same(a: any, b: any) {
         if (a == null && b == null)
             return true;
         if (a == null || b == null)
@@ -1325,7 +1128,7 @@ export class Utils {
         if (a instanceof Array && b instanceof Array) {
             if (a.length != b.length)
                 return false;
-            for (var i = 0; i < a.length; i++) {
+            for (let i = 0; i < a.length; i++) {
                 if (!this.same(a[i], b[i]))
                     return false;
             }
@@ -1333,10 +1136,14 @@ export class Utils {
         }
         if (a instanceof Object && b instanceof Object) {
             var obj = {};
-            for (var i in a)
+            for (var i in a) {
+                // @ts-ignore
                 obj[i] = true;
-            for (var i in b)
+            }
+            for (var i in b) {
+                // @ts-ignore
                 obj[i] = true;
+            }
             for (var i in obj) {
                 if (!this.same(a[i], b[i]))
                     return false;

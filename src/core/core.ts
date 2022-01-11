@@ -1,5 +1,8 @@
-import { Icons } from "./icons";
+// @ts-nocheck
+import { clone } from "lodash-es";
+import { Icons, IconData } from "./icons";
 import { Utils } from "./utils";
+
 
 class Core {
     readonly __SIZE__ = 13;
@@ -7,13 +10,13 @@ class Core {
     readonly __HALF_SIZE__ = Math.floor(this.__SIZE__ / 2);
 
     material = {
-        animates: {},
-        images: {},
-        items: {},
-        enemys: {},
-        icons: {},
-        ground: null,
-        grundCanvas: null,
+        animates: {} as Record<string, Animate>,
+        images: {} as Record<string, HTMLImageElement>,
+        items: {} as Record<string, Item>,
+        enemys: {} as Record<string, Enemy>,
+        icons: {} as any as IconData,
+        ground: null as any as CanvasRenderingContext2D,
+        grundCanvas: null as any as HTMLCanvasElement,
         groundPattern: null,
         autotileEdges: {},
     };
@@ -67,16 +70,6 @@ class Core {
         'fileReader': null,
         'successCallback': null,
         'errorCallback': null, // 读取失败
-    };
-    // 样式
-    domStyle = {
-        scale: 1.0,
-        ratio: 1.0,
-        hdCanvas: ["damage", "ui", "data"],
-        availableScale: [],
-        isVertical: false,
-        showStatusBar: true,
-        toolbarBtn: false,
     };
     bigmap = {
         canvas: ["bg", "event", "event2", "fg", "damage"],
@@ -213,43 +206,41 @@ class Core {
     };
     // 标记的楼层列表，用于数据统计
     markedFloorIds = {};
-    status = {};
-    dymCanvas = {};
+    status = {} as any as gameStatus;
+    dymCanvas: Record<string, CanvasRenderingContext2D> = {};
 
     tilesets: string[] = [];
+    /** 
+     * 获得所有楼层的信息
+     * @example core.floors[core.status.floorId].events // 获得本楼层的所有自定义事件
+     */
+    floors: Record<string, Floor> = {};
+
+    canvas: Record<string, CanvasRenderingContext2D> = {}
 
     /////////// 系统事件相关 ///////////
 
     ////// 初始化 //////
-    async init(coreData: any) {
+    init(coreData: any) {
         // for (var key in coreData)
         //     core[key] = coreData[key];
         this._init_flags();
-        // this._init_platform();
         // this._init_others();
         // this._init_plugins();
 
         // 初始化画布
-        // for (var name in core.canvas) {
-        //     if (core.domStyle.hdCanvas.indexOf(name) >= 0)
-        //         core.maps._setHDCanvasSize(core.canvas[name], core.__PIXELS__, core.__PIXELS__);
-        //     else {
-        //         core.canvas[name].canvas.width = core.__PIXELS__;
-        //         core.canvas[name].canvas.height = core.__PIXELS__;
-        //     }
-        // }
+        for (var name in core.canvas) {
+            core.canvas[name].canvas.width = core.__PIXELS__;
+            core.canvas[name].canvas.height = core.__PIXELS__;
+        }
 
-        // core.loader._load(function () {
-        //     core.extensions._load(function () {
-        //         core._afterLoadResources(callback);
-        //     });
-        // });
+        // core._afterLoadResources(callback);
     }
 
     private _init_flags() {
-        core.flags = core.clone(core.data.flags);
-        core.values = core.clone(core.data.values);
-        core.firstData = core.clone(core.data.firstData);
+        core.flags = clone(core.data.flags);
+        core.values = clone(core.data.values);
+        core.firstData = clone(core.data.firstData);
         this._init_sys_flags();
         
         // 让你总是拼错！——拼错了就爬！
@@ -320,10 +311,14 @@ class Core {
             return e1.index - e2.index;
         })
     
-    }    
+    }
 }
 
-type Forward<T> = { [ K in keyof T ]: Extract<T[K], Function> }[keyof T]
+let a: string = 1;
+
+type Forward<T> = {
+    [ K in keyof T as T[K] extends Function ? K : never ]: T[K]
+}
 
 type core = Core
     & Forward<Utils> & { utils: Utils }
@@ -331,7 +326,7 @@ type core = Core
 
 function createCore(): core {
     const core = new Core();
-    function forward(libname: string, lib: Object) {
+    const forward = (libname: string, lib: Object) => {
         // @ts-ignore
         raw[libname] = lib;
         const prototype = Object.getPrototypeOf(lib);

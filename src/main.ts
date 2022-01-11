@@ -1,3 +1,9 @@
-import { testb } from "./tb";
+import { createApp } from "vue";
+import App from "@/view/App.vue";
+import { showLoading } from "@/view/layers/loading";
 
-testb.bb();
+function init() {
+    showLoading();
+}
+
+createApp(App, { init }).mount("#app");

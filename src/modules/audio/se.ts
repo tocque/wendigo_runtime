@@ -17,6 +17,7 @@ class SEPlayer {
             this.audioContext = new AudioContext();
         } else {
             this.audioContext = null;
+            console.log(`[SEPlayer] 该浏览器不支持AudioContext`);
         }
     }
 
@@ -28,7 +29,7 @@ class SEPlayer {
 
     private _config = new Config({
         muted: false,
-        volume: 100
+        volume: 70
     });
 
     /**
