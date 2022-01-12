@@ -1,6 +1,12 @@
 // @ts-nocheck
 import { clone } from "lodash-es";
+import { Control } from "./control";
+import { Enemys } from "./enemys";
+import { Events } from "./events";
 import { Icons, IconData } from "./icons";
+import { Items } from "./items";
+import { Maps } from "./maps";
+import { UI } from "./ui";
 import { Utils } from "./utils";
 
 
@@ -11,13 +17,16 @@ class Core {
 
     material = {
         animates: {} as Record<string, Animate>,
-        images: {} as Record<string, HTMLImageElement>,
+        images: {
+            tilesets: {} as Record<string, HTMLImageElement>,
+            images: {} as Record<string, HTMLImageElement>,
+        },
         items: {} as Record<string, Item>,
         enemys: {} as Record<string, Enemy>,
         icons: {} as any as IconData,
         ground: null as any as CanvasRenderingContext2D,
-        grundCanvas: null as any as HTMLCanvasElement,
-        groundPattern: null,
+        groundCanvas: null as any as CanvasRenderingContext2D,
+        groundPattern: null as any as CanvasPattern | null,
         autotileEdges: {},
     };
     timeout = {
@@ -55,22 +64,6 @@ class Core {
         "asyncId": {},
         "lastAsyncId": null
     };
-    platform = {
-        'isOnline': true,
-        'isPC': true,
-        'isAndroid': false,
-        'isIOS': false,
-        'string': 'PC',
-        'isWeChat': false,
-        'isQQ': false,
-        'isChrome': false,
-        'supportCopy': false,
-
-        'fileInput': null,
-        'fileReader': null,
-        'successCallback': null,
-        'errorCallback': null, // 读取失败
-    };
     bigmap = {
         canvas: ["bg", "event", "event2", "fg", "damage"],
         offsetX: 0,
@@ -83,8 +76,9 @@ class Core {
         threshold: 1024,
         extend: 10,
         scale: 1.0,
-        tempCanvas: null,
-        cacheCanvas: null, // A cache canvas
+        tempCanvas: null as any as CanvasRenderingContext2DSettings,
+        /** A cache canvas */
+        cacheCanvas: null as any as CanvasRenderingContext2DSettings,
     };
     initStatus = {
         'played': false,
@@ -216,7 +210,9 @@ class Core {
      */
     floors: Record<string, Floor> = {};
 
-    canvas: Record<string, CanvasRenderingContext2D> = {}
+    canvas: Record<string, CanvasRenderingContext2D> = {};
+
+    nameMap: Record<string, string> = {};
 
     /////////// 系统事件相关 ///////////
 
@@ -257,60 +253,23 @@ class Core {
         core.material.items = core.items.getItems();
         core.material.icons = core.icons.getIcons();
     
-        // 初始化自动事件
-        for (var floorId in core.floors) {
-            var autoEvents = core.floors[floorId].autoEvent || {};
-            for (var loc in autoEvents) {
-                var locs = loc.split(","), x = parseInt(locs[0]), y = parseInt(locs[1]);
-                for (var index in autoEvents[loc]) {
-                    var autoEvent = core.clone(autoEvents[loc][index]);
-                    if (autoEvent && autoEvent.condition && autoEvent.data) {
-                        autoEvent.floorId = floorId;
-                        autoEvent.x = x;
-                        autoEvent.y = y;
-                        autoEvent.index = index;
-                        autoEvent.symbol = floorId + "@" + x + "@" + y + "@" + index;
-                        autoEvent.condition = core.replaceValue(autoEvent.condition);
-                        autoEvent.data = core.precompile(autoEvent.data);
-                        core.initStatus.autoEvents.push(autoEvent);
-                    }
-                }
-            }
-        }
-        // 道具的穿上/脱下，视为自动事件
-        for (var equipId in core.material.items) {
-            var equip = core.material.items[equipId];
-            if (equip.cls != 'equips' || !equip.equip) continue;
-            if (!equip.equip.equipEvent && !equip.equip.unequipEvent) continue;
-            var equipFlag = '_equipEvent_' + equipId;
-            var autoEvent1 = {
-                symbol: "_equipEvent_" + equipId,
-                currentFloor: false,
-                multiExecute: true,
-                condition: "core.hasEquip('" + equipId + "') && !core.hasFlag('"+equipFlag+"')",
-                data: core.precompile([{"type": "setValue", "name": "flag:" + equipFlag, "value": "true"}].concat(equip.equip.equipEvent||[])),
-            };
-            var autoEvent2 = {
-                symbol: "_unequipEvent_" + equipId,
-                currentFloor: false,
-                multiExecute: true,
-                condition: "!core.hasEquip('" + equipId + "') && core.hasFlag('"+equipFlag+"')",
-                data: core.precompile([{"type": "setValue", "name": "flag:" + equipFlag, "value": "null"}].concat(equip.equip.unequipEvent||[])),
-            };
-            core.initStatus.autoEvents.push(autoEvent1);
-            core.initStatus.autoEvents.push(autoEvent2);
-        }
-    
-        core.initStatus.autoEvents.sort(function (e1, e2) {
-            if (e1.floorId == null) return 1;
-            if (e2.floorId == null) return -1;
-            if (e1.priority != e2.priority) return e2.priority - e1.priority;
-            if (e1.floorId != e2.floorId) return core.floorIds.indexOf(e1.floorId) - core.floorIds.indexOf(e2.floorId);
-            if (e1.x != e2.x) return e1.x - e2.x;
-            if (e1.y != e2.y) return e1.y - e2.y;
-            return e1.index - e2.index;
-        })
-    
+        core.events.initAutoEvents();
+    }
+
+    _init_others() {
+        // 一些额外的东西
+        core.material.groundCanvas = document.createElement('canvas').getContext('2d');
+        core.material.groundCanvas.canvas.width = core.material.groundCanvas.canvas.height = 32;
+        core.material.groundPattern = core.material.groundCanvas.createPattern(core.material.groundCanvas.canvas, 'repeat');
+        core.bigmap.tempCanvas = document.createElement('canvas').getContext('2d');
+        core.bigmap.cacheCanvas = document.createElement('canvas').getContext('2d');
+        core.loadImage("materials", 'fog', function (name, img) { core.animateFrame.weather.fog = img; });
+        core.loadImage("materials", "cloud", function (name, img) { core.animateFrame.weather.cloud = img; })
+        core.loadImage("materials", "sun", function (name, img) { core.animateFrame.weather.sun = img; })
+        core.loadImage("materials", 'keyboard', function (name, img) {core.material.images.keyboard = img; });
+        // 记录存档编号
+        core.saves.saveIndex = core.getLocalStorage('saveIndex', 1);
+        core.control.getSaveIndexes(function (indexes) { core.saves.ids = indexes; });
     }
 }
 
@@ -321,11 +280,17 @@ type Forward<T> = {
 }
 
 type core = Core
-    & Forward<Utils> & { utils: Utils }
+    & Forward<Control> & { control: Control }
+    & Forward<Enemys> & { enemys: Enemys }
+    & Forward<Events> & { events: Events }
     & Forward<Icons> & { icons: Icons }
-
-function createCore(): core {
-    const core = new Core();
+    & Forward<Items> & { items: Items }
+    & Forward<Maps> & { maps: Maps }
+    & Forward<UI> & { ui: UI }
+    & Forward<Utils> & { utils: Utils }
+    
+    function createCore(): core {
+        const core = new Core();
     const forward = (libname: string, lib: Object) => {
         // @ts-ignore
         raw[libname] = lib;
@@ -343,8 +308,14 @@ function createCore(): core {
             eval(`core.${ key } = function (${ parameters }) {\n\treturn core.${ libname }.${ key }(${ parameters });\n}`);
         });
     }
-    forward("utils", Utils);
+    forward("control", Control);
+    forward("enemys", Enemys);
+    forward("events", Events);
     forward("icons", Icons);
+    forward("items", Items);
+    forward("maps", Maps);
+    forward("ui", UI);
+    forward("utils", Utils);
     // @ts-ignore
     return core;
 }

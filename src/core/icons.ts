@@ -97,13 +97,13 @@ export class Icons {
         }
 
         core.tilesets = core.tilesets || [];
-        var startOffset = this.tilesetStartOffset;
-        for (var i in core.tilesets) {
-            var imgName = core.tilesets[i];
-            var img = core.material.images.tilesets[imgName];
-            var width = Math.floor(parseInt(img.getAttribute('_width')) / 32), height = Math.floor(parseInt(img.getAttribute('_height')) / 32);
+        let startOffset = this.tilesetStartOffset;
+        for (const imgName of core.tilesets) {
+            const img = core.material.images.tilesets[imgName];
+            const width = Math.floor(parseInt(img.getAttribute('_width') as string) / 32),
+                height = Math.floor(parseInt(img.getAttribute('_height') as string) / 32);
             if (id >= startOffset && id < startOffset + width * height) {
-                var x = (id - startOffset) % width, y = parseInt((id - startOffset) / width);
+                var x = (id - startOffset) % width, y = ~~((id - startOffset) / width);
                 return { "image": imgName, "x": x, "y": y };
             }
             startOffset += this.tilesetStartOffset;

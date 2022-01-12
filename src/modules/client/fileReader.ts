@@ -13,8 +13,6 @@ class _FileReader {
                 core.readFileContent(this.fileReader.result);
             };
             this.fileReader.onerror = () => {
-                if (core.platform.errorCallback)
-                    core.platform.errorCallback();
             }
         }
     }

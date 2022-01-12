@@ -4,6 +4,7 @@
  */
 
 import { addToClipboard } from "@/modules/client/clipboard";
+import { download } from "@/modules/client/download";
 import { core } from "./core";
 import { decodeRoute, encodeRoute } from "./route";
 
@@ -249,6 +250,7 @@ export class Utils {
 
     /**
      * 设置本地存储
+     * @deprecated
      */
     setLocalStorage(key: string, value?: any) {
         try {
@@ -274,8 +276,14 @@ export class Utils {
             return false;
         }
     }
-    ////// 获得本地存储 //////
-    getLocalStorage(key, defaultValue) {
+    /**
+     * 获得本地存储
+     * @deprecated
+     * @param key 
+     * @param defaultValue 
+     * @returns 
+     */
+    getLocalStorage<T>(key: string, defaultValue: T): T {
         try {
             var value = JSON.parse(localStorage.getItem(core.firstData.name + "_" + key));
             if (value == null)
@@ -285,15 +293,20 @@ export class Utils {
             return defaultValue;
         }
     }
-    ////// 移除本地存储 //////
-    removeLocalStorage(key) {
+    /**
+     * 移除本地存储
+     * @deprecated
+     * @param key 
+     */
+    removeLocalStorage(key: string) {
         localStorage.removeItem(core.firstData.name + "_" + key);
         if (key == 'autoSave')
             delete core.saves.ids[0];
         else if (/^save\d+$/.test(key))
             delete core.saves.ids[parseInt(key.substring(4))];
     }
-    setLocalForage(key, value, successCallback, errorCallback) {
+    /** 往数据库写入一段数据 */
+    setLocalForage(key: string, value?: any, successCallback?: () => void, errorCallback?: () => void) {
         if (value == null) {
             this.removeLocalForage(key);
             return;
@@ -331,7 +344,8 @@ export class Utils {
             localforage.setItem(name, compressed, callback);
         }
     }
-    getLocalForage(key, defaultValue, successCallback, errorCallback) {
+    /** 从数据库读出一段数据 */
+    getLocalForage(key: string, defaultValue?: any, successCallback?: (data: any) => void, errorCallback?: () => void) {
         var name = core.firstData.name + "_" + key;
         var callback = function (err, value) {
             if (err) {
@@ -364,7 +378,8 @@ export class Utils {
             localforage.getItem(name, callback);
         }
     }
-    removeLocalForage(key, successCallback, errorCallback) {
+    /** 移除数据库的数据 */
+    removeLocalForage(key: string, successCallback?: () => void, errorCallback?: () => void) {
         var name = core.firstData.name + "_" + key;
         var callback = function (err) {
             if (err) {
@@ -546,7 +561,7 @@ export class Utils {
      * @returns 子图组成的数组，在原图中呈先行后列，从左到右、从上到下排列。
      */
     splitImage(image: string | HTMLImageElement, width = 32, height = width): HTMLImageElement[] {
-        if (typeof image == "string") {
+        if (typeof image === "string") {
             image = core.getMappedName(image);
             image = core.material.images.images[image];
         }
@@ -786,16 +801,22 @@ export class Utils {
             count += str.charCodeAt(i) < 256 ? 1 : 2;
         }
         return count;
-    }
-    turnDirection(turn, direction) {
-        direction = direction || core.getHeroLoc('direction');
-        var directionList = ["left", "leftup", "up", "rightup", "right", "rightdown", "down", "leftdown"];
-        if (directionList.indexOf(turn) >= 0)
-            return turn;
-        if (turn == ':hero')
-            return core.getHeroLoc('direction');
-        if (turn == ':backhero')
-            return this.turnDirection(':back', core.getHeroLoc('direction'));
+    }/**
+     * 计算应当转向某个方向
+     * @param turn 转向的方向
+     * @param direction 当前方向
+     */
+    turnDirection(turn: string | number, direction?: string): string {
+        direction = direction ?? core.getHeroLoc('direction');
+        const directionList = ["left", "leftup", "up", "rightup", "right", "rightdown", "down", "leftdown"];
+        if (typeof turn === 'string') {
+            if (directionList.indexOf(turn) >= 0)
+                return turn;
+            if (turn == ':hero')
+                return core.getHeroLoc('direction');
+            if (turn == ':backhero')
+                return this.turnDirection(':back', core.getHeroLoc('direction'));
+        }
         if (typeof turn === 'number' && turn % 45 == 0)
             turn /= 45;
         else {
@@ -806,9 +827,9 @@ export class Utils {
                 default: turn = 0; break;
             }
         }
-        var index = directionList.indexOf(direction);
+        var index = directionList.indexOf(direction as string);
         if (index < 0)
-            return direction;
+            return direction as string;
         return directionList[(index + (turn || 0)) % directionList.length];
     }
     
@@ -853,7 +874,7 @@ export class Utils {
         }).join(''));
     }
     rand(num: number) {
-        var rand = core.getFlag('__rand__');
+        var rand = core.getFlag('__rand__', 0);
         rand = this.__next_rand(rand);
         core.setFlag('__rand__', rand);
         var ans = rand / 2147483647;
@@ -900,152 +921,101 @@ export class Utils {
         return _rand;
     }
     ////// 读取一个本地文件内容 //////
-    readFile(success: () => void, error, accept, readType) {
+    /**
+     * 尝试请求读取一个本地文件内容 [异步]
+     * @param success 成功后的回调
+     * @param error 失败后的回调
+     * @param accept 允许的文件后缀名
+     * @param readType 不设置则以文本读取，否则以DataUrl形式读取
+     */
+    readFile(success: () => void, error: () => void, accept?: string, readType?: boolean) {
 
-        core.platform.successCallback = success;
-        core.platform.errorCallback = error;
+        // core.platform.successCallback = success;
+        // core.platform.errorCallback = error;
 
-        // @ts-ignore
-        if (window.jsinterface) {
-            // @ts-ignore
-            window.jsinterface.readFile();
-            return;
-        }
+        // // @ts-ignore
+        // if (window.jsinterface) {
+        //     // @ts-ignore
+        //     window.jsinterface.readFile();
+        //     return;
+        // }
 
-        // step 0: 不为http/https，直接不支持
-        if (!core.platform.isOnline) {
-            alert("离线状态下不支持文件读取！");
-            if (error)
-                error();
-            return;
-        }
+        // // step 0: 不为http/https，直接不支持
+        // if (!core.platform.isOnline) {
+        //     alert("离线状态下不支持文件读取！");
+        //     if (error)
+        //         error();
+        //     return;
+        // }
 
-        // Step 1: 如果不支持FileReader，直接不支持
-        if (core.platform.fileReader == null) {
-            alert("当前浏览器不支持FileReader！");
-            if (error)
-                error();
-            return;
-        }
+        // // Step 1: 如果不支持FileReader，直接不支持
+        // if (core.platform.fileReader == null) {
+        //     alert("当前浏览器不支持FileReader！");
+        //     if (error)
+        //         error();
+        //     return;
+        // }
 
-        if (core.platform.fileInput == null) {
-            core.platform.fileInput = document.createElement("input");
-            core.platform.fileInput.style.opacity = 0;
-            core.platform.fileInput.type = 'file';
-            core.platform.fileInput.onchange = function () {
-                var files = core.platform.fileInput.files;
-                if (files.length == 0) {
-                    if (core.platform.errorCallback)
-                        core.platform.errorCallback();
-                    return;
-                }
-                if (!readType)
-                    core.platform.fileReader.readAsText(core.platform.fileInput.files[0]);
-                else
-                    core.platform.fileReader.readAsDataURL(core.platform.fileInput.files[0]);
-                core.platform.fileInput.value = '';
-            };
-        }
-        core.platform.fileInput.value = '';
-        if (accept)
-            core.platform.fileInput.accept = accept;
+        // if (core.platform.fileInput == null) {
+        //     core.platform.fileInput = document.createElement("input");
+        //     core.platform.fileInput.style.opacity = 0;
+        //     core.platform.fileInput.type = 'file';
+        //     core.platform.fileInput.onchange = function () {
+        //         var files = core.platform.fileInput.files;
+        //         if (files.length == 0) {
+        //             if (core.platform.errorCallback)
+        //                 core.platform.errorCallback();
+        //             return;
+        //         }
+        //         if (!readType)
+        //             core.platform.fileReader.readAsText(core.platform.fileInput.files[0]);
+        //         else
+        //             core.platform.fileReader.readAsDataURL(core.platform.fileInput.files[0]);
+        //         core.platform.fileInput.value = '';
+        //     };
+        // }
+        // core.platform.fileInput.value = '';
+        // if (accept)
+        //     core.platform.fileInput.accept = accept;
 
-        core.platform.fileInput.click();
+        // core.platform.fileInput.click();
     }
     ////// 读取文件完毕 //////
-    readFileContent(content) {
-        var obj = null;
-        if (content.slice(0, 4) === 'data') {
-            if (core.platform.successCallback)
-                core.platform.successCallback(content);
-            return;
-        }
-        // 检查base64
-        try {
-            obj = JSON.parse(LZString.decompressFromBase64(content));
-        } catch (e) { }
-        if (!obj) {
-            try {
-                obj = JSON.parse(content);
-            } catch (e) {
-                main.log(e);
-            }
-        }
+    readFileContent(content: string) {
+        // var obj = null;
+        // if (content.slice(0, 4) === 'data') {
+        //     if (core.platform.successCallback)
+        //         core.platform.successCallback(content);
+        //     return;
+        // }
+        // // 检查base64
+        // try {
+        //     obj = JSON.parse(LZString.decompressFromBase64(content));
+        // } catch (e) { }
+        // if (!obj) {
+        //     try {
+        //         obj = JSON.parse(content);
+        //     } catch (e) {
+        //         main.log(e);
+        //     }
+        // }
 
-        if (obj) {
-            if (core.platform.successCallback)
-                core.platform.successCallback(obj);
-            return;
-        }
+        // if (obj) {
+        //     if (core.platform.successCallback)
+        //         core.platform.successCallback(obj);
+        //     return;
+        // }
 
-        if (core.platform.errorCallback)
-            core.platform.errorCallback();
+        // if (core.platform.errorCallback)
+        //     core.platform.errorCallback();
     }
-    ////// 下载文件到本地 //////
+    /**
+     * 
+     * @param filename 
+     * @param content 
+     */
     download(filename: string, content: string) {
-
-        // @ts-ignore
-        if (window.jsinterface) {
-            // @ts-ignore
-            window.jsinterface.download(filename, content);
-            return;
-        }
-
-        // Step 0: 不为http/https，直接不支持
-        if (!core.platform.isOnline) {
-            alert("离线状态下不支持下载操作！");
-            return;
-        }
-
-        // Step 1: 如果是iOS平台，直接不支持
-        if (core.platform.isIOS) {
-            if (addToClipboard(content)) {
-                alert("iOS平台下不支持直接下载文件！\n所有应下载内容已经复制到您的剪切板，请自行创建空白文件并粘贴。");
-            } else {
-                alert("iOS平台下不支持下载操作！");
-            }
-            return;
-        }
-
-        // Step 2: 如果不是PC平台（Android），则只支持chrome
-        if (!core.platform.isPC) {
-            if (!core.platform.isChrome || core.platform.isQQ || core.platform.isWeChat) { // 检测chrome
-                if (addToClipboard(content)) {
-                    alert("移动端只有Chrome浏览器支持直接下载文件！\n所有应下载内容已经复制到您的剪切板，请自行创建空白文件并粘贴。");
-                }
-                else {
-                    alert("该平台或浏览器暂不支持下载操作！");
-                }
-                return;
-            }
-        }
-
-        // Step 3: 如果是Safari浏览器，则提示并打开新窗口
-        if (core.platform.isSafari) {
-            alert("你当前使用的是Safari浏览器，不支持直接下载文件。\n即将打开一个新窗口为应下载内容，请自行全选复制然后创建空白文件并粘贴。");
-            var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            var href = window.URL.createObjectURL(blob);
-            var opened = window.open(href, "_blank");
-            window.URL.revokeObjectURL(href);
-            return;
-        }
-
-        // Step 4: 下载
-        var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        // @ts-ignore
-        if (window.navigator.msSaveOrOpenBlob) {
-            // @ts-ignore
-            window.navigator.msSaveBlob(blob, filename);
-        } else {
-            var href = window.URL.createObjectURL(blob);
-            var elem = window.document.createElement('a');
-            elem.href = href;
-            elem.download = filename;
-            document.body.appendChild(elem);
-            elem.click();
-            document.body.removeChild(elem);
-            window.URL.revokeObjectURL(href);
-        }
+        download(filename, content);
     }
     /**
      * 复制一段内容到剪切板

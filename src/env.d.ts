@@ -17,4 +17,11 @@ declare var main: {
      * 游戏资源版本号
      */
     version: number;
+
+    /**
+     * 游戏模式
+     */
+    mode: string;
+
+    log(err: any): void
 }

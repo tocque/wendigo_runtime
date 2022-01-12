@@ -167,6 +167,15 @@ class BGMPlayer {
     }
 
     /**
+     * 设置BGM的播放速度和音调
+     * @param speed 
+     * @param usePitch 
+     */
+    setSpeed(speed: number, usePitch?: boolean) {
+        this._applyContext({ speed, usePitch });
+    }
+
+    /**
      * 对当前正在播放的音乐应用BGM上下文
      * @param context 
      */

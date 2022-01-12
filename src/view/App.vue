@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from '@vue/runtime-core';
 import { VIEW_WIDTH, VIEW_HEIGHT } from '@/constant';
+import Main from './main/Index.vue';
 import { viewManager } from './view';
 import { resizer } from './resizer';
 
@@ -18,6 +19,7 @@ const STYLE = {
 
 <template>
     <div class="main" :style="STYLE">
+        <Main></Main>
         <template  v-for="([layer, closeHandler]) of viewManager.stack">
             <component class="layer" :is="layer" :close="closeHandler"></component>
         </template>
