@@ -3,8 +3,8 @@ import { TOWER_ID } from "../../constant";
 
 export class Config<T extends Record<string, any>> { 
 
-    defaultValue: T;
-    cache: Partial<{ [ K in keyof T ]: Ref<T[K]> }>;
+    private defaultValue: T;
+    private cache: Partial<{ [ K in keyof T ]: Ref<T[K]> }>;
 
     constructor(defaultValue: T) {
         this.defaultValue = defaultValue;

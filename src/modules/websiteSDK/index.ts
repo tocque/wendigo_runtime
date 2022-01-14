@@ -1,10 +1,13 @@
 import { TOWER_ID, VERSION } from "@/constant";
 import { createFormData } from "@/utils/net";
 import axios from "axios";
+import { platform } from "../client/platform";
 
 class WebsiteSDK {
     /**
      * 报告游玩
+     * @param hard 难度名 
+     * @param hardCode 难度编码
      */
     async reportPlay(hard: string, hardCode: number) {
         await axios.post("/games/upload.php", createFormData({
@@ -20,6 +23,11 @@ class WebsiteSDK {
 
     /**
      * 上传成绩
+     * @param username 用户名 
+     * @param ending 
+     * @param hard 
+     * @param score 
+     * @param route 
      */
     async uploadScore(username: string, ending: string, hard: string, score: number, route: string) {
         await axios.post("/games/upload.php", createFormData({
