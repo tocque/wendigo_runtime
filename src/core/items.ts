@@ -3,25 +3,32 @@ import { clone } from "lodash-es";
 import { core } from "./core";
 
 export interface Item {
+    name: string
     cls: string
     itemEffect?: string
     [key: string]: any
 }
 
+const EMPTYITEM: Item = {
+    name: "",
+    cls: "@null",
+}
+
+export type ItemData = Record<string, Item>;
+
 export class Items {
 
-    items: Record<string, Item> = {};
+    // @ts-ignore
+    items: ItemData;
 
-    constructor() {
-        this._init();
-    }
-    ////// 初始化 //////
-    _init() {
-        // @ts-ignore
-        this.items = items_296f5d02_12fd_4166_a7c1_b5e830c9ee3a;
-        for (var itemId in this.items) {
-            this.items[itemId].id = itemId;
-        }
+    /**
+     * 初始化
+     */
+    init(itemData: ItemData) {
+        this.items = itemData;
+        Object.entries(this.items).forEach(([ itemId, itemObj ]) => {
+            itemObj.id = itemId;
+        });
     }
     ////// 获得所有道具 //////
     getItems() {
@@ -422,8 +429,8 @@ export class Items {
             core.status.hero[name] += result.value[name];
     }
     _realLoadEquip(type: number, loadId: string | null, unloadId: string | null, callback?: () => void) {
-        const loadEquip =   loadId ? core.material.items[loadId] : {},
-            unloadEquip = unloadId ? core.material.items[unloadId] : {};
+        const loadEquip =   loadId ? core.material.items[loadId] : EMPTYITEM,
+            unloadEquip = unloadId ? core.material.items[unloadId] : EMPTYITEM;
 
         // --- 音效
         this._realLoadEquip_playSound();
@@ -460,7 +467,7 @@ export class Items {
      * @param index 套装编号，自然数
      */
     quickSaveEquip(index: number) {
-        var saveEquips = core.getFlag("saveEquips", [] as string[][]);
+        var saveEquips = core.getFlag("saveEquips", [] as (string | null)[][]);
         saveEquips[index] = clone(core.status.hero.equipment);
         core.setFlag("saveEquips", saveEquips);
         core.status.route.push("saveEquip:" + index);
@@ -472,7 +479,7 @@ export class Items {
      * @param index 套装编号，自然数
      */
     quickLoadEquip(index: number) {
-        var current = core.getFlag("saveEquips", [] as string[][])[index];
+        var current = core.getFlag("saveEquips", [] as (string | null)[][])[index];
         if (!current) {
             core.playSound('操作失败');
             core.drawTip(index + "号套装不存在");
@@ -533,7 +540,7 @@ export class Items {
         if (core.hasEquip(equipId)) {
             // 设置一个临时装备，然后模拟换装操作
             var tempId = 'temp:' + equipId;
-            core.material.items[tempId] = { 'cls': 'equips', 'equip': clone(toEquipInfo) };
+            core.material.items[tempId] = { 'name': 'temp', 'cls': 'equips', 'equip': clone(toEquipInfo) };
             this._loadEquipEffect(tempId, equipId);
             delete core.material.items[tempId];
             core.updateStatusBar();

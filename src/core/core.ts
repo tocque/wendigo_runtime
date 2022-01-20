@@ -1,32 +1,42 @@
-// @ts-nocheck
+import { Config } from "@/modules/storage/config";
 import { clone } from "lodash-es";
 import { Control } from "./control";
-import { Enemys } from "./enemys";
+import { Data, GameStatus } from "./data";
+import { EnemyData, Enemys } from "./enemys";
 import { Events } from "./events";
 import { Icons, IconData } from "./icons";
-import { Items } from "./items";
-import { Maps } from "./maps";
+import { ItemData, Items } from "./items";
+import { Loader } from "./loader";
+import { Animate, Floor, Maps } from "./maps";
 import { UI } from "./ui";
 import { Utils } from "./utils";
 
+export const MATERIALS = [
+    'animates', 'enemys', 'items', 'npcs', 'terrains', 'enemy48', 'npc48', 'icons',
+    'fog', 'cloud', 'sun', 'keyboard',
+] as const;
 
 class Core {
     readonly __SIZE__ = 13;
     readonly __PIXELS__ = this.__SIZE__ * 32;
     readonly __HALF_SIZE__ = Math.floor(this.__SIZE__ / 2);
 
+    // @ts-ignore
+    data: Data;
+    // @ts-ignore
+    firstData: Data['firstData'];
+
     material = {
         animates: {} as Record<string, Animate>,
         images: {
+            autotile: {} as Record<string, HTMLImageElement>,
             tilesets: {} as Record<string, HTMLImageElement>,
             images: {} as Record<string, HTMLImageElement>,
+            ...({} as { [ K in typeof MATERIALS[number] ]: HTMLImageElement })
         },
-        items: {} as Record<string, Item>,
-        enemys: {} as Record<string, Enemy>,
+        items: {} as ItemData,
+        enemys: {} as EnemyData,
         icons: {} as any as IconData,
-        ground: null as any as CanvasRenderingContext2D,
-        groundCanvas: null as any as CanvasRenderingContext2D,
-        groundPattern: null as any as CanvasPattern | null,
         autotileEdges: {},
     };
     timeout = {
@@ -56,9 +66,9 @@ class Core {
             'level': 1,
             'nodes': [],
             'data': null,
-            'fog': null,
-            'cloud': null,
-            'sun': null
+            'fog': null as any as HTMLImageElement,
+            'cloud': null as any as HTMLImageElement,
+            'sun': null as any as HTMLImageElement
         },
         "tip": null,
         "asyncId": {},
@@ -177,17 +187,17 @@ class Core {
             "letterSpacing": 0,
             "animateTime": 0,
         },
-        // "globalAttribute": {
-        //     'equipName': main.equipName || [],
-        //     "statusLeftBackground": main.styles.statusLeftBackground || "url(project/materials/ground.png) repeat",
-        //     "statusTopBackground": main.styles.statusTopBackground || "url(project/materials/ground.png) repeat",
-        //     "toolsBackground": main.styles.toolsBackground || "url(project/materials/ground.png) repeat",
-        //     "borderColor": main.styles.borderColor || [204, 204, 204, 1],
-        //     "statusBarColor": main.styles.statusBarColor || [255, 255, 255, 1],
-        //     "floorChangingStyle": main.styles.floorChangingStyle || "background-color: black; color: white",
-        //     "selectColor": main.styles.selectColor || [255, 215, 0, 1],
-        //     "font": main.styles.font || "Verdana"
-        // },
+        "globalAttribute": {
+            // 'equipName': main.equipName || [],
+            // "statusLeftBackground": main.styles.statusLeftBackground || "url(project/materials/ground.png) repeat",
+            // "statusTopBackground": main.styles.statusTopBackground || "url(project/materials/ground.png) repeat",
+            // "toolsBackground": main.styles.toolsBackground || "url(project/materials/ground.png) repeat",
+            // "borderColor": main.styles.borderColor || [204, 204, 204, 1],
+            // "statusBarColor": main.styles.statusBarColor || [255, 255, 255, 1],
+            // "floorChangingStyle": main.styles.floorChangingStyle || "background-color: black; color: white",
+            // "selectColor": main.styles.selectColor || [255, 215, 0, 1],
+            "font": "Verdana"
+        },
         'curtainColor': null,
 
         // 动画
@@ -200,7 +210,7 @@ class Core {
     };
     // 标记的楼层列表，用于数据统计
     markedFloorIds = {};
-    status = {} as any as gameStatus;
+    status = {} as any as GameStatus;
     dymCanvas: Record<string, CanvasRenderingContext2D> = {};
 
     tilesets: string[] = [];
@@ -214,14 +224,35 @@ class Core {
 
     nameMap: Record<string, string> = {};
 
+    flags: Record<string, boolean> = {};
+
+    values: Record<string, number> = {};
+
+    userConfig = new Config({
+        enemyDamage: true,
+        critical: true,
+        extraDamage: true,
+        enableEnemyPoint: 0,
+        leftHandPrefer: false,
+        extraDamageType: 0,
+        moveSpeed: 100,
+        floorChangeTime: 500,
+    });
+
     /////////// 系统事件相关 ///////////
 
-    ////// 初始化 //////
-    init(coreData: any) {
-        // for (var key in coreData)
-        //     core[key] = coreData[key];
+
+    async load() {
+        await core.loader.loadData();
+        await core.loader.addPreloadTask();
+    }
+
+    /**
+     * 初始化
+     */
+    init() {
         this._init_flags();
-        // this._init_others();
+        this._init_others();
         // this._init_plugins();
 
         // 初始化画布
@@ -245,7 +276,7 @@ class Core {
         // window.ture = true;
         // window.flase = false;
     
-        (core.firstData.shops||[]).forEach(function (t) { core.initStatus.shops[t.id] = t; });
+        // (core.firstData.shops||[]).forEach(function (t) { core.initStatus.shops[t.id] = t; });
     
         core.maps._initFloors();
         // 初始化怪物、道具等
@@ -258,26 +289,36 @@ class Core {
 
     _init_others() {
         // 一些额外的东西
-        core.material.groundCanvas = document.createElement('canvas').getContext('2d');
-        core.material.groundCanvas.canvas.width = core.material.groundCanvas.canvas.height = 32;
-        core.material.groundPattern = core.material.groundCanvas.createPattern(core.material.groundCanvas.canvas, 'repeat');
-        core.bigmap.tempCanvas = document.createElement('canvas').getContext('2d');
-        core.bigmap.cacheCanvas = document.createElement('canvas').getContext('2d');
-        core.loadImage("materials", 'fog', function (name, img) { core.animateFrame.weather.fog = img; });
-        core.loadImage("materials", "cloud", function (name, img) { core.animateFrame.weather.cloud = img; })
-        core.loadImage("materials", "sun", function (name, img) { core.animateFrame.weather.sun = img; })
-        core.loadImage("materials", 'keyboard', function (name, img) {core.material.images.keyboard = img; });
-        // 记录存档编号
-        core.saves.saveIndex = core.getLocalStorage('saveIndex', 1);
-        core.control.getSaveIndexes(function (indexes) { core.saves.ids = indexes; });
+
+        core.animateFrame.weather.fog = core.material.images.fog;
+        core.animateFrame.weather.cloud = core.material.images.cloud;
+        core.animateFrame.weather.sun = core.material.images.sun;
+        core.material.images.images.keyboard = core.material.images.keyboard;
+        // // 记录存档编号
+        // core.saves.saveIndex = core.getLocalStorage('saveIndex', 1);
+        // core.control.getSaveIndexes(function (indexes) { core.saves.ids = indexes; });
+    }
+
+    _init_sys_flags = function () {
+        if (core.flags.equipboxButton) core.flags.equipment = true;
+        core.flags.displayEnemyDamage = core.userConfig.get('enemyDamage');
+        core.flags.displayCritical = core.userConfig.get('critical');
+        core.flags.displayExtraDamage = core.userConfig.get('extraDamage');
+        // @ts-ignore
+        core.flags.enableEnemyPoint = core.userConfig.get('enableEnemyPoint');
+        core.flags.leftHandPrefer = core.userConfig.get('leftHandPrefer');
+        // @ts-ignore
+        core.flags.extraDamageType = core.userConfig.get('extraDamageType');
+        // 行走速度
+        core.values.moveSpeed = core.userConfig.get('moveSpeed');
+        core.values.floorChangeTime = core.userConfig.get('floorChangeTime');
+        // core.flags.enableHDCanvas = core.getLocalStorage('enableHDCanvas', !core.platform.isIOS);
     }
 }
 
-let a: string = 1;
-
-type Forward<T> = {
+type Forward<T> = Omit<{
     [ K in keyof T as T[K] extends Function ? K : never ]: T[K]
-}
+}, "init">;
 
 type core = Core
     & Forward<Control> & { control: Control }
@@ -285,6 +326,7 @@ type core = Core
     & Forward<Events> & { events: Events }
     & Forward<Icons> & { icons: Icons }
     & Forward<Items> & { items: Items }
+    & Forward<Loader> & { loader: Loader }
     & Forward<Maps> & { maps: Maps }
     & Forward<UI> & { ui: UI }
     & Forward<Utils> & { utils: Utils }
@@ -297,7 +339,7 @@ type core = Core
         const prototype = Object.getPrototypeOf(lib);
         Reflect.ownKeys(prototype).forEach((key) => {
             if (typeof key !== "string") return;
-            if (key === "constructor") return;
+            if (key === "constructor" || key === "init" || key === "load") return;
             if (key.charAt(0) === '_') return;
             if (!(Object.getOwnPropertyDescriptor(prototype, key)?.value instanceof Function)) return;
             // @ts-ignore
@@ -313,6 +355,7 @@ type core = Core
     forward("events", Events);
     forward("icons", Icons);
     forward("items", Items);
+    forward("loader", Loader);
     forward("maps", Maps);
     forward("ui", UI);
     forward("utils", Utils);

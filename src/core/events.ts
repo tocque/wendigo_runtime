@@ -1,18 +1,43 @@
 // @ts-nocheck
 
+import { core } from "./core";
+import { HeroData, HeroLoc } from "./data";
+
 export type MotaAction = { 
     type: string, 
     [key: string]: any 
 } | string
 
+export type MotaEvent = MotaAction[];
+
+export interface EventData {
+    commonEvent: Record<string, MotaEvent>
+}
+
+export interface EventMethods {
+    resetGame: (hero: HeroData, hard: string, floorId: string, maps: any[], values: Record<string, number>) => void;
+    changingFloor: (floorId: string, heroLoc: HeroLoc) => void
+    afterChangeFloor: (floorId: string) => void
+    beforeBattle: (enemyId: string, x: number, y: number) => void
+    afterBattle: (enemyId: string, x: number, y: number) => void
+    afterOpenDoor: (doorId: string, x: number, y: number) => void
+    afterGetItem: (doorId: string, x: number, y: number, isGentleClick: boolean) => void
+    afterPushBox: () => void
+}
+
 export class Events {
-    constructor() {
-        this._init();
-    }
-    ////// 初始化 //////
-    _init() {
-        this.eventdata = functions_d6ad677b_427a_4623_b50f_a445a3b0ef8a.events;
-        this.commonEvent = events_c12a15a8_c380_4b28_8144_256cba95f760.commonEvent;
+
+    eventdata: EventData;
+    commonEvent: Record<string, MotaEvent>;
+    systemEvents: Record<string, any>;
+    actions: Record<string, any>;
+
+    /**
+     * 初始化
+     */
+    init(eventData: EventData, eventMethods: EventMethods) {
+        this.eventdata = eventMethods;
+        this.commonEvent = eventData.commonEvent;
         this.systemEvents = {};
         this.actions = {};
     }

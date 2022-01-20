@@ -10,16 +10,27 @@ import { sePlayer } from "@/modules/audio/se";
 import { resizer } from "@/view/resizer";
 import { core } from "./core";
 
+export interface ControlMethods {
+    
+}
+
+export interface RenderFrameFunc {
+    name: string
+    needPlaying: boolean
+    func: (timestamp: number) => void
+}
+
 export class Control {
-    constructor() {
-        this._init();
-    }
-    _init() {
-        this.controldata = functions_d6ad677b_427a_4623_b50f_a445a3b0ef8a.control;
-        this.renderFrameFuncs = [];
-        this.replayActions = [];
-        this.weathers = {};
-        this.resizes = [];
+   
+    // @ts-ignore
+    controldata: ControlMethods
+    renderFrameFuncs = [] as RenderFrameFunc[];
+    replayActions = [];
+    weathers = {};
+    resizes = [];
+
+    init(controlMethods: ControlMethods) {
+        this.controldata = controlMethods;
         // --- 注册系统的animationFrame
         this.registerAnimationFrame("totalTime", false, this._animationFrame_totalTime);
         this.registerAnimationFrame("autoSave", true, this._animationFrame_autoSave);
@@ -52,12 +63,12 @@ export class Control {
         this.registerReplayAction("ignoreInput", this._replayAction_ignoreInput);
         this.registerReplayAction("no", this._replayAction_no);
         // --- 注册系统的resize
-        this.registerResize("gameGroup", this._resize_gameGroup);
-        this.registerResize("canvas", this._resize_canvas);
-        this.registerResize("statusBar", this._resize_statusBar);
-        this.registerResize("status", this._resize_status);
-        this.registerResize("toolBar", this._resize_toolBar);
-        this.registerResize("tools", this._resize_tools);
+        // this.registerResize("gameGroup", this._resize_gameGroup);
+        // this.registerResize("canvas", this._resize_canvas);
+        // this.registerResize("statusBar", this._resize_statusBar);
+        // this.registerResize("status", this._resize_status);
+        // this.registerResize("toolBar", this._resize_toolBar);
+        // this.registerResize("tools", this._resize_tools);
     }
     // ------ requestAnimationFrame 相关 ------ //
     /**
@@ -66,9 +77,9 @@ export class Control {
      * @param needPlaying 是否只在游戏运行时才执行（在标题界面不执行）
      * @param func 要执行的函数，或插件中的函数名；可接受timestamp（从页面加载完毕到当前所经过的时间）作为参数
      */ 
-    registerAnimationFrame(name: string, needPlaying: boolean, func?: (timestamp: number) => void) {
+    registerAnimationFrame(name: string, needPlaying: boolean, func: (timestamp: number) => void) {
         this.unregisterAnimationFrame(name);
-        this.renderFrameFuncs.push({ name: name, needPlaying: needPlaying, func: func });
+        this.renderFrameFuncs.push({ name, needPlaying, func });
     }
     /** 注销一个animationFrame */
     unregisterAnimationFrame(name: string) {
@@ -78,12 +89,12 @@ export class Control {
     _setRequestAnimationFrame() {
         this._checkRequestAnimationFrame();
         core.animateFrame.totalTime = Math.max(core.animateFrame.totalTime, core.getLocalStorage('totalTime', 0));
-        var loop = function (timestamp) {
+        var loop = function (timestamp: number) {
             core.control.renderFrameFuncs.forEach(function (b) {
                 if (b.func) {
                     try {
                         if (core.isPlaying() || !b.needPlaying)
-                            core.doFunc(b.func, core.control, timestamp);
+                            b.func.call(core.control, timestamp);
                     }
                     catch (e) {
                         main.log(e);
@@ -100,14 +111,19 @@ export class Control {
         (function () {
             var lastTime = 0;
             var vendors = ['webkit', 'moz'];
-            for (var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
-                window.requestAnimationFrame = window[vendors[x] + 'RequestAnimationFrame'];
-                window.cancelAnimationFrame = window[vendors[x] + 'CancelAnimationFrame'] || // Webkit中此取消方法的名字变了
-                    window[vendors[x] + 'CancelRequestAnimationFrame'];
-            }
+            window.requestAnimationFrame = window.requestAnimationFrame
+                // @ts-ignore
+                ?? window.webkitRequestAnimationFrame
+                // @ts-ignore
+                ?? window.mozRequestAnimationFrame
+            window.cancelAnimationFrame = window.cancelAnimationFrame
+                // @ts-ignore
+                ?? window.webkitCancelRequestAnimationFrame
+                // @ts-ignore
+                ?? window.mozCancelAnimationFrame
 
             if (!window.requestAnimationFrame) {
-                window.requestAnimationFrame = function (callback, element) {
+                window.requestAnimationFrame = function (callback) {
                     var currTime = new Date().getTime();
                     var timeToCall = Math.max(0, 16.7 - (currTime - lastTime));
                     var id = window.setTimeout(function () {
@@ -124,7 +140,7 @@ export class Control {
             }
         } ());
     }
-    _animationFrame_totalTime(timestamp) {
+    _animationFrame_totalTime(timestamp: number) {
         core.animateFrame.totalTime += timestamp - core.animateFrame.totalTimeStart;
         core.animateFrame.totalTimeStart = timestamp;
         if (core.isPlaying()) {
@@ -133,13 +149,13 @@ export class Control {
             core.status.hero.statistics.start = timestamp;
         }
     }
-    _animationFrame_autoSave(timestamp) {
-        if (timestamp - core.saves.autosave.time <= 5000)
-            return;
-        core.control.checkAutosave();
-        core.saves.autosave.time = timestamp;
+    _animationFrame_autoSave(timestamp: number) {
+        // if (timestamp - core.saves.autosave.time <= 5000)
+        //     return;
+        // core.control.checkAutosave();
+        // core.saves.autosave.time = timestamp;
     }
-    _animationFrame_globalAnimate(timestamp) {
+    _animationFrame_globalAnimate(timestamp: number) {
         if (timestamp - core.animateFrame.globalTime <= core.values.animateSpeed)
             return;
         core.status.globalAnimateStatus++;
@@ -167,7 +183,7 @@ export class Control {
         core.drawBoxAnimate();
         core.animateFrame.globalTime = timestamp;
     }
-    _animationFrame_animate(timestamp) {
+    _animationFrame_animate(timestamp: number) {
         if (timestamp - core.animateFrame.animateTime < 50 || !core.status.animateObjs || core.status.animateObjs.length == 0)
             return;
         core.clearMap('animate');
@@ -195,7 +211,7 @@ export class Control {
         });
         core.animateFrame.animateTime = timestamp;
     }
-    _animationFrame_heroMoving(timestamp) {
+    _animationFrame_heroMoving(timestamp: number) {
         if (core.status.heroMoving <= 0)
             return;
         // 换腿
@@ -205,7 +221,7 @@ export class Control {
         }
         core.drawHero(core.animateFrame.leftLeg ? 'leftFoot' : 'rightFoot', 4 * core.status.heroMoving);
     }
-    _animationFrame_weather(timestamp) {
+    _animationFrame_weather(timestamp: number) {
         var weather = core.animateFrame.weather, type = weather.type;
         if (!core.dymCanvas.weather || !core.control.weathers[type] || !core.control.weathers[type].frameFunc)
             return;
@@ -333,7 +349,7 @@ export class Control {
         core.setOpacity('weather', core.clamp(opacity, 0, 1));
         core.animateFrame.weather.time = timestamp;
     }
-    _animateFrame_tip(timestamp) {
+    _animateFrame_tip(timestamp: number) {
         if (core.animateFrame.tip == null)
             return;
         var tip = core.animateFrame.tip;
@@ -363,50 +379,23 @@ export class Control {
             core.animateFrame.tip = null;
         }
     }
-    _animationFrame_parallelDo(timestamp) {
+    _animationFrame_parallelDo(timestamp: number) {
         core.control.controldata.parallelDo(timestamp);
     }
     // ------ 标题界面的处理 ------ //
     ////// 显示游戏开始界面 //////
     showStartAnimate(noAnimate, callback) {
-        this._showStartAnimate_resetDom();
-        if (core.flags.startUsingCanvas || noAnimate)
-            return this._showStartAnimate_finished(core.flags.startUsingCanvas, callback);
-        core.hideWithAnimate(core.dom.startTop, 20, function () {
-            core.control._showStartAnimate_finished(false, callback);
-        });
+
     }
     _showStartAnimate_resetDom() {
-        core.dom.startPanel.style.opacity = 1;
-        core.dom.startPanel.style.display = "block";
-        core.dom.startTop.style.opacity = 1;
-        core.dom.startTop.style.display = "block";
-        core.dom.startButtonGroup.style.display = 'none';
-        core.dom.startButtons.style.display = 'block';
-        core.dom.levelChooseButtons.style.display = 'none';
-        core.status.played = false;
-        core.clearStatus();
-        core.clearMap('all');
-        core.dom.musicBtn.style.display = 'block';
-        core.dom.enlargeBtn.style.display = 'block';
-        core.setMusicBtn();
-        // 重置音量
-        core.events.setVolume(1, 0);
-        core.updateStatusBar();
+
     }
     _showStartAnimate_finished(start, callback) {
-        core.dom.startTop.style.display = 'none';
-        core.dom.startButtonGroup.style.display = 'block';
-        main.selectedButton = null;
-        main.selectButton(0);
-        if (start)
-            core.startGame();
-        if (callback)
-            callback();
+        
     }
     ////// 隐藏游戏开始界面 //////
     hideStartAnimate(callback) {
-        core.hideWithAnimate(core.dom.startPanel, 20, callback);
+        
     }
     ////// 游戏是否已经开始 //////
     isPlaying() {
@@ -2717,7 +2706,7 @@ export class Control {
             this.setWeather(null);
         }
     }
-    _weather_rain(level) {
+    _weather_rain(level: number) {
         var number = level * parseInt(20 * core.bigmap.width * core.bigmap.height / (core.__SIZE__ * core.__SIZE__));
         for (var a = 0; a < number; a++) {
             core.animateFrame.weather.nodes.push({
@@ -2729,7 +2718,7 @@ export class Control {
             });
         }
     }
-    _weather_snow(level) {
+    _weather_snow(level: number) {
         var number = level * parseInt(20 * core.bigmap.width * core.bigmap.height / (core.__SIZE__ * core.__SIZE__));
         for (var a = 0; a < number; a++) {
             core.animateFrame.weather.nodes.push({
@@ -2740,7 +2729,7 @@ export class Control {
             });
         }
     }
-    _weather_fog(level) {
+    _weather_fog(level: number) {
         if (!core.animateFrame.weather.fog)
             return;
         core.animateFrame.weather.nodes = [{
@@ -2753,7 +2742,7 @@ export class Control {
             'delta': 0.001,
         }];
     }
-    _weather_cloud(level) {
+    _weather_cloud(level: number) {
         if (!core.animateFrame.weather.cloud)
             return;
         core.animateFrame.weather.nodes = [{
@@ -2766,7 +2755,7 @@ export class Control {
             'delta': 0.001,
         }];
     }
-    _weather_sun(level) {
+    _weather_sun(level: number) {
         if (!core.animateFrame.weather.sun)
             return;
         // 直接绘制
@@ -2978,17 +2967,6 @@ export class Control {
     ////// ------ resize处理 ------ //
     // _shouldDisplayStatus(id) {
     // }
-    ////// 注册一个resize函数 //////
-    // name为名称，可供注销使用
-    /**
-     * 注册一个resize函数
-     * @deprecated
-     * @param name 名称，可供注销使用
-     * @param func 可以是一个函数，或者是插件中的函数名；可以接受obj参数，详见resize函数。
-     */
-    registerResize(name: string, func: (obj: any) => void) {
-        //
-    }
     /**
      * 注册一个resize函数
      * @deprecated

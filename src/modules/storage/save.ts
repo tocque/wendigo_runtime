@@ -76,7 +76,7 @@ class SaveManager {
             saveIndex.treeIds.map(async (treeId) => {
                 const data = await largeFileStorage.get<TreeNode>(`saveTree_${ treeId }`);
                 if (data) {
-                    this.saveTrees[treeId] = new SaveTree(data);
+                    // this.saveTrees[treeId] = new SaveTree(data);
                 } else {
                     broken.add(treeId);
                 }
@@ -99,7 +99,9 @@ class SaveManager {
         return this.nodeMap[nodeId];
     }
 
-    createBrench
+    createBrench() {
+
+    }
 
     async getSave(saveId: number) {
         const key = SaveManager.getSaveKey(saveId);

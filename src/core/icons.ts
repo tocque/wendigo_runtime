@@ -37,13 +37,13 @@ export class Icons {
     
     // @ts-ignore
     icons: IconData;
+    /** tileset的起点 */
     tilesetStartOffset = 10000;
 
-    init() {
-        // @ts-ignore
-        this.icons = icons_4665ee12_3a1f_44a4_bea3_0fccba634dc1;
+    init(iconData: IconData) {
+        this.icons = iconData;
+        core.material.icons = iconData;
         //delete(icons_4665ee12_3a1f_44a4_bea3_0fccba634dc1);
-        // tileset的起点
     }
     getIcons() {
         var icons = clone(this.icons);

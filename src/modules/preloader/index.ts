@@ -17,10 +17,10 @@ class Preloader {
 
     private tasks: Promise<void>[] = [];
 
-    addTask(task: LoadingTask) {
+    addTask(taskConstructor: LoadingTask) {
         let prevLoaded = 0, prevTotal = 0;
-        this.tasks.push(new Promise<void>((res) => {
-            task(
+        const task = new Promise<void>((res) => {
+            taskConstructor(
                 (loaded, total) => {
                     this.loaded.value += (loaded - prevLoaded);
                     this.total.value += (total - prevTotal);
@@ -29,7 +29,9 @@ class Preloader {
                 },
                 () => res(),
             );
-        }))
+        });
+        this.tasks.push(task);
+        return task;
     }
 
     /**

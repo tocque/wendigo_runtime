@@ -1,5 +1,6 @@
 // @ts-nocheck
 
+import { createCTX } from "@/utils/canvas";
 import { core } from "./core";
 
 export interface BlockInfo {
@@ -15,20 +16,53 @@ export interface Block {
     event: BlockInfo
 }
 
+export type MapData = Record<string, BlockInfo>;
+
+export interface frameObj {
+    angle: number
+    index: number
+    mirror: number
+    opacity: number
+    x: number
+    y: number
+    zoom: number
+}
+
+export interface Animate {
+    frame: number
+    frames: FrameObj[][]
+    images: (HTMLImageElement | null)[]
+    ratio: number
+    pitch: number
+    se: string
+}
+
+export interface Floor {
+    title: string,
+    ratio: number
+}
+
 export class Maps {
 
-    blocksInfo: Record<string, BlockInfo>;
+    blocksInfo: MapData;
 
-    constructor() {
-        this._init();
-    }
-    _init() {
-        this.blocksInfo = maps_90f36752_8815_4be8_b32b_d7fad1d0542e;
+    groundCanvas = createCTX();
+    groundPattern: CanvasPattern | null;
+
+    private tempCanvas = createCTX();
+    private cacheCanvas = createCTX();
+
+    init(mapData: MapData) {
+        this.blocksInfo = mapData;
         //delete(maps_90f36752_8815_4be8_b32b_d7fad1d0542e);
+        const ctx = this.groundCanvas;
+        const canvas = ctx.canvas;
+        canvas.width = canvas.height = 32;
+        this.groundPattern = ctx.createPattern(ctx.canvas, 'repeat');
     }
-    _initFloors(floorId) {
+    _initFloors(floorId?: string) {
         if (!floorId) {
-            core.floorIds.forEach(function (floorId) {
+            core.floorIds.forEach((floorId) => {
                 core.maps._initFloors(floorId);
             });
             return;
@@ -1202,9 +1236,9 @@ export class Maps {
         if (name == 'bg') {
             if (height > 32) {
                 core.clearMap(ctx, px, py - 32, 32, 32);
-                core.drawImage(ctx, core.material.groundCanvas.canvas, px, py - 32);
+                core.drawImage(ctx, this.groundCanvas.canvas, px, py - 32);
             }
-            core.drawImage(ctx, core.material.groundCanvas.canvas, px, py);
+            core.drawImage(ctx, this.groundCanvas.canvas, px, py);
         }
         var alpha = null;
         if (blockInfo.opacity != null)
@@ -1235,11 +1269,11 @@ export class Maps {
         var groundInfo = core.getBlockInfo(groundId);
         if (groundInfo == null)
             return;
-        core.material.groundCanvas.clearRect(0, 0, 32, 32);
-        core.material.groundCanvas.drawImage(groundInfo.image, 32 * groundInfo.posX, groundInfo.height * groundInfo.posY, 32, 32, 0, 0, 32, 32);
-        core.material.groundPattern = core.material.groundCanvas.createPattern(core.material.groundCanvas.canvas, 'repeat');
+        this.groundCanvas.clearRect(0, 0, 32, 32);
+        this.groundCanvas.drawImage(groundInfo.image, 32 * groundInfo.posX, groundInfo.height * groundInfo.posY, 32, 32, 0, 0, 32, 32);
+        this.groundPattern = this.groundCanvas.createPattern(this.groundCanvas.canvas, 'repeat');
         // 如果需要用纯色可以直接将下面代码改成改成
-        // core.material.groundPattern = '#000000';
+        // this.groundPattern = '#000000';
     }
     ////// 绘制某张地图 //////
     drawMap(floorId) {
@@ -1342,7 +1376,7 @@ export class Maps {
 
         var cacheCtx = toDrawCtx;
         if (config.onMap) {
-            cacheCtx = core.bigmap.cacheCanvas;
+            cacheCtx = this.cacheCanvas;
             cacheCtx.canvas.width = toDrawCtx.canvas.width;
             cacheCtx.canvas.height = toDrawCtx.canvas.height;
             if (core.bigmap.v2)
@@ -1399,7 +1433,7 @@ export class Maps {
 
         var cacheCtx = toDrawCtx;
         if (config.onMap) {
-            cacheCtx = core.bigmap.cacheCanvas;
+            cacheCtx = this.cacheCanvas;
             cacheCtx.canvas.width = toDrawCtx.canvas.width;
             cacheCtx.canvas.height = toDrawCtx.canvas.height;
             if (core.bigmap.v2)
@@ -1457,7 +1491,7 @@ export class Maps {
 
         var cacheCtx = toDrawCtx;
         if (config.onMap) {
-            cacheCtx = core.bigmap.cacheCanvas;
+            cacheCtx = this.cacheCanvas;
             cacheCtx.canvas.width = toDrawCtx.canvas.width;
             cacheCtx.canvas.height = toDrawCtx.canvas.height;
             if (core.bigmap.v2)
@@ -1767,7 +1801,7 @@ export class Maps {
         core.setFilter(cv, block.filter);
         if (block.name) {
             if (block.name == 'bg')
-                core.drawImage('bg', core.material.groundCanvas.canvas, 32 * x - 32 * core.bigmap.posX, 32 * y - 32 * core.bigmap.posY);
+                core.drawImage('bg', this.groundCanvas.canvas, 32 * x - 32 * core.bigmap.posX, 32 * y - 32 * core.bigmap.posY);
             this._drawAutotile(cv, this._getBgFgMapArray(block.name), block, 32, 0, 0, animate, true);
         }
         else {
@@ -1837,7 +1871,7 @@ export class Maps {
         var width = core.floors[floorId].width;
         var height = core.floors[floorId].height;
         // 绘制到tempCanvas上面
-        var tempCanvas = core.bigmap.tempCanvas;
+        var tempCanvas = this.tempCanvas;
 
         // 如果是大地图模式？
         if (options.all) {
@@ -1920,7 +1954,7 @@ export class Maps {
             centerX = Math.floor(width / 2);
         if (centerY == null)
             centerY = Math.floor(height / 2);
-        var tempCanvas = core.bigmap.tempCanvas;
+        var tempCanvas = this.tempCanvas;
 
         if (options.all) {
             var tempWidth = tempCanvas.canvas.width, tempHeight = tempCanvas.canvas.height;
@@ -3123,7 +3157,7 @@ export class Maps {
             } else {
                 var ctx = obj.ctx || 'ui';
                 core.clearMap(ctx, obj.bgx, obj.bgy, obj.bgWidth, obj.bgHeight);
-                core.fillRect(ctx, obj.bgx, obj.bgy, obj.bgWidth, obj.bgHeight, core.material.groundPattern);
+                core.fillRect(ctx, obj.bgx, obj.bgy, obj.bgWidth, obj.bgHeight, this.groundPattern);
                 core.drawImage(ctx, obj.image, core.status.globalAnimateStatus % obj.animate * 32, obj.pos,
                     32, obj.height, obj.x, obj.y, obj.dw || 32, obj.dh || obj.height);
             }

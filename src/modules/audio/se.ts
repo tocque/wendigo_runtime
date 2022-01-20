@@ -1,3 +1,4 @@
+import { BlobReader } from "@zip.js/zip.js";
 import { readonly } from "vue";
 import { Config } from "../storage/config";
 
@@ -21,10 +22,16 @@ class SEPlayer {
         }
     }
 
-    async load(buffer: ArrayBufferLike) {
-        if (this.audioContext) {
-            await this.audioContext.decodeAudioData(buffer);
+    async load(filename: string, buffer: ArrayBufferLike | Blob) {
+        if (!this.audioContext) return;
+        if (buffer instanceof Blob) {
+            const blobReader = new BlobReader(buffer);
+            await blobReader.init();
+            const uint8Array = await blobReader.readUint8Array(0, blobReader.size);
+            buffer = uint8Array.buffer;
         }
+        const audioBuffer = await this.audioContext.decodeAudioData(buffer);
+        this.soundEffects[filename] = audioBuffer;
     }
 
     private _config = new Config({

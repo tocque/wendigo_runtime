@@ -25,8 +25,8 @@ class BGMPlayer {
      * 添加播放列表
      * @param bgmList 
      */
-    addPlaylist(bgmList: Record<string, string>) {
-        Object.entries(bgmList).forEach(([ name, url ]) => {
+    addPlaylist(bgmList: [ string, string ][]) {
+        bgmList.forEach(([ name, url ]) => {
             this.addOne(name, url);
         })
     }

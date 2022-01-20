@@ -17,20 +17,32 @@ export interface Enemy {
     [key: string]: any
 }
 
+export type EnemyData = Record<string, Enemy>
+
+type TextGen = string | ((enemy: Enemy) => string);
+
+type EnemySpecial = [ number, TextGen, TextGen, string ];
+
+export type EnemyMethods = {
+    getSpecials: () => EnemySpecial[],
+    getEnemyInfo: (enemy: Enemy, hero: any, x: number, y: number, floorId: string) => any,
+    getDamageInfo: (enemy: Enemy, hero: any, x: number, y: number, floorId: string) => any,
+}
+
 export class Enemys {
 
-    enemys: Record<string, Enemy>;
+    enemys: EnemyData;
+    enemydata: EnemyMethods;
 
-    constructor() {
-        this._init();
-    }
-    ////// 初始化 //////
-    _init() {
-        this.enemys = enemys_fcae963b_31c9_42b4_b48c_bb48d09f3f80;
-        this.enemydata = functions_d6ad677b_427a_4623_b50f_a445a3b0ef8a.enemys;
-        for (var enemyId in this.enemys) {
-            this.enemys[enemyId].id = enemyId;
-        }
+    /**
+     * 初始化
+     */
+    init(enemyData: EnemyData, enemyMethods: EnemyMethods) {
+        this.enemys = enemyData;
+        this.enemydata = enemyMethods;
+        Object.entries(this.enemys).forEach(([ enemyId, enemyObj ]) => {
+            enemyObj.id = enemyId;
+        });
         if (main.mode == 'play') {
             this.enemydata.hasSpecial = function (a, b) {
                 return core.enemys.hasSpecial(a, b);
