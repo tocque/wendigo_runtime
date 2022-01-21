@@ -2891,7 +2891,7 @@ export class Control {
      */
     playSound(sound: string, pitch?: number, callback?: () => any) {
         sound = core.getMappedName(sound);
-        const [ id, promise ]= sePlayer.play(sound, { pitch });
+        const [ id, promise ] = sePlayer.play(sound, { pitch });
         promise.then(() => {
             callback?.();
         })

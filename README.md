@@ -24,6 +24,7 @@ filereader以及其他读写类UI也需要重构
 
 ## 模块结构
 
+```
 public/
     main.js 标准运行时入口
     project/ 工程资源
@@ -55,9 +56,9 @@ src/
             SEplayer.ts SE播放器
         storage/ 存储管理
             config.ts 配置管理
-            storage.ts 存档管理
-        
+            storage.ts 存档管理     
     core/
+```
 
 ## 数据流
 
