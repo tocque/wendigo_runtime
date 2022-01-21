@@ -2883,10 +2883,19 @@ export class Control {
     triggerBgm() {
         bgmPlayer.setMuted(!bgmPlayer.muted);
     }
-    /** 播放一个音效 */
+    /**
+     * 播放一个音效
+     * @param sound 
+     * @param pitch 
+     * @param callback 
+     */
     playSound(sound: string, pitch?: number, callback?: () => any) {
         sound = core.getMappedName(sound);
-        sePlayer.play(sound, { pitch }).then(callback);
+        const [ id, promise ]= sePlayer.play(sound, { pitch });
+        promise.then(() => {
+            callback?.();
+        })
+        return id;
     }
     /** 停止（所有）音频 */
     stopSound(id?: number) {

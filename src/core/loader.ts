@@ -66,13 +66,15 @@ export class Loader {
     }
 
     private async loadFloor() {
+        core.floorIds = core.data.main.floorIds;
         const dataString = await (async () => {
             if (main.useCompress) {
                 const { data } = await axios.get<string>(`./project/floor.min.js?v=${ main.version }`);
                 return data;
             } else {
-                const tasks = Object.keys(core.data).map((name) => {
-                    return axios.get<string>(`./project/floors/${ name }.js?v=${ main.version }`);
+                const tasks = core.floorIds.map(async (name) => {
+                    const { data } = await axios.get<string>(`./project/floors/${ name }.js?v=${ main.version }`);
+                    return data;
                 });
                 return (await Promise.all(tasks)).join("\n");
             }
@@ -94,18 +96,22 @@ export class Loader {
                 const { data } = await axios.get<string>(`./project/project.min.js?v=${ main.version }`);
                 return data;
             } else {
-                const tasks = Object.keys(guidMap).map((name) => {
-                    return axios.get<string>(`./project/${ name }.min.js?v=${ main.version }`);
+                const tasks = Object.keys(guidMap).map(async (name) => {
+                    const { data } = await axios.get<string>(`./project/${ name }.js?v=${ main.version }`);
+                    return data;
                 });
                 return (await Promise.all(tasks)).join("\n");
             }
         })();
         const fetchString = Object.entries(guidMap)
-            .map(([ key, guid ]) => `key: "${key}_${ guid }"`)
+            .map(([ key, guid ]) => `${ key }: ${key}_${ guid }`)
             .join(",");
+        console.log(`
+            ({ ${ fetchString } })
+        `);
         const puredata = eval(`
             ${ dataString };
-            { ${ fetchString } }
+            ({ ${ fetchString } })
         `) as PureData;
         core.data = puredata.data;
         core.enemys.init(puredata.enemys, puredata.functions.enemys);
@@ -224,13 +230,15 @@ export class Loader {
         document.body.appendChild(style);
     }
     loadImages(list: string[]) {
-        this.addTaskFromList("autotiles", list, "blob", async (filename, data) => {
+        this.addTaskFromList("images", list, "blob", async (filename, data) => {
             core.material.images.images[filename] = await createImageFromBlob(data);
         });
     }
     async loadMaterials(list: string[]) {
         await this.addTaskFromList("materials", list, "blob", async (filename, data) => {
             core.material.images[filename as typeof MATERIALS[number]] = await createImageFromBlob(data);
+        }, {
+            suffix: ".png"
         });
     }
 
@@ -244,10 +252,10 @@ export class Loader {
         this.addTaskFromList("tilesets", list, "blob", async (filename, data) => {
             const image = await createImageFromBlob(data);
             if (image.width % 32 !== 0 || image.height % 32 !== 0) {
-                console.warn(`警告！${ filename }的宽或高不是32的倍数！`);
+                console.warn(`[loader.tilesetTask] ${ filename }(${ image.width } * ${ image.height })的宽或高不是32的倍数！`);
             }
             if (image.width * image.height > 32 * 32 * 3000) {
-                console.warn(`警告！${ filename }上的图块素材个数大于3000！`);
+                console.warn(`[loader.tilesetTask] ${ filename }上的图块素材个数大于3000！`);
             }
             core.material.images.tilesets[filename] = image;
         });

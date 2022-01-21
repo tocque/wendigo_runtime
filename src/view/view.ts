@@ -1,3 +1,4 @@
+import { isEmpty, last } from "lodash-es";
 import { Component, markRaw, reactive } from "vue";
 
 /**
@@ -5,7 +6,7 @@ import { Component, markRaw, reactive } from "vue";
  */
 class ViewManager {
 
-    stack: [Component, (value: any) => void][] = reactive([]);
+    stack: [Component, (value?: any) => void][] = reactive([]);
 
     /**
      * 向UI栈中追加一个UI，当其被释放时，promise完成
@@ -16,13 +17,17 @@ class ViewManager {
         const value = await new Promise<any>((res) => {
             this.stack.push(markRaw([component, res]));
         });
-        const index = this.stack.findIndex((e) => {
-            return e[0] === component;
-        });
-        if (index === -1) {
-            console.error("UI栈错误");
-        }
-        this.stack = this.stack.slice(0, index-1);
+        while (true) {
+            const top = last(this.stack);
+            if (!top) {
+                console.error("UI栈错误");
+                break;
+            } else if (top[0] === component) {
+                this.stack.pop();
+                break;
+            }
+            this.stack.pop();
+        };
         return value;
     }
 }

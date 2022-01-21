@@ -1,7 +1,10 @@
 // @ts-nocheck
 
+import { websiteSDK } from "@/modules/websiteSDK";
+import { sleep } from "@/utils/common";
+import { cloneDeep } from "lodash-es";
 import { core } from "./core";
-import { HeroData, HeroLoc } from "./data";
+import { GameLevel, HeroData, HeroLoc } from "./data";
 
 export type MotaAction = { 
     type: string, 
@@ -46,27 +49,33 @@ export class Events {
     resetGame(hero, hard, floorId, maps, values) {
         this.eventdata.resetGame(hero, hard, floorId, maps, values);
     }
-    ////// 游戏开始事件 //////
-    startGame(hard, seed, route, callback) {
-        main.dom.levelChooseButtons.style.display = 'none';
-        main.dom.startButtonGroup.style.display = 'none';
-        hard = hard || "";
+    /**
+     * 开始新游戏, 当游戏结束时Resolve
+     * @example core.startGame('咸鱼乱撞', 0); // 开始一局咸鱼乱撞难度的新游戏，随机种子为0
+     * @param hard 难度名，会显示在左下角（横屏）或右下角（竖屏）
+     */
+    async startNewGame(hard: string) {
+        if (main.mode !== 'play') return;
 
-        if (main.mode != 'play')
-            return;
+        core.events._startGame(hard, 0);
 
-        // 无动画的开始游戏
-        if (core.flags.startUsingCanvas || route != null) {
-            core.dom.startPanel.style.display = 'none';
-            this._startGame_start(hard, seed, route, callback);
-        }
-        else {
-            core.hideStartAnimate(function () {
-                core.events._startGame_start(hard, seed, route, callback);
-            });
-        }
+        return core.startPlay();
     }
-    _startGame_start(hard, seed, route, callback) {
+    
+    /**
+     * 播放录像
+     * @example core.startFromReplay('咸鱼乱撞', 0, ''); // 播放一局咸鱼乱撞难度的游戏录像，随机种子为0
+     * @param hard 难度名，会显示在左下角（横屏）或右下角（竖屏）
+     * @param seed 随机种子，相同的种子保证了录像的可重复性
+     * @param route 经由base64压缩后的录像，用于从头开始的录像回放
+     */
+    async startFromReplay(hard: string, seed: number, route: string[]) {
+        core.events._startGame(hard, seed);
+        core.startReplay(route);
+
+        return core.startPlay();
+    }
+    private _startGame(hard: string, seed: number) {
         console.log('开始游戏');
         core.resetGame(core.firstData.hero, hard, null, core.cloneArray(core.initStatus.maps));
         core.setHeroLoc('x', -1);
@@ -75,64 +84,41 @@ export class Events {
         if (seed != null && seed > 0) {
             core.setFlag('__seed__', seed);
             core.setFlag('__rand__', seed);
-        }
-        else
+        } else {
             core.utils.__init_seed();
+        }
         core.clearStatusBar();
 
-        var todo = [];
-        if (core.flags.startUsingCanvas) {
-            core.hideStatusBar();
-            core.dom.musicBtn.style.display = 'block';
-            core.dom.enlargeBtn.style.display = 'block';
-            core.push(todo, core.firstData.startCanvas);
-        }
-        core.push(todo, { "type": "function", "function": "function() { core.events._startGame_setHard(); }" });
-        core.push(todo, core.firstData.startText);
-        this.insertAction(todo, null, null, function () {
-            core.events._startGame_afterStart(callback);
+        const todo = [
+            { "type": "function", "function": `function() { core.events._startGame_setHard(${ hard }); }` },
+            ...cloneDeep(core.firstData.startText),
+        ];
+        console.log(todo);
+        this.insertAction(todo, null, null, () => {
+            core.events._startGame_afterStart();
         });
-
-        if (route != null)
-            core.startReplay(route);
     }
-    _startGame_setHard() {
+    _startGame_setHard(name: string) {
         // 根据难度设置flag:hard
         // 这一段应当在startCanvas之后，startText之前做
-        var hardValue = 0;
-        var hardColor = 'red';
-        main.levelChoose.forEach(function (one) {
-            if (one.name == core.status.hard) {
-                hardValue = one.hard;
-                hardColor = core.arrayToRGBA(one.color || [255, 0, 0, 1]);
-                core.insertAction(one.action);
-            }
-        });
-        core.setFlag('hard', hardValue || 0);
-        core.setFlag('__hardColor__', hardColor);
+        const defaultLevel: GameLevel = {
+            name, title: "", hard: 0, color: 'red', action: []
+        }
+        const level = core.data.main.levelChoose.find((level) => level.name === name) ?? defaultLevel;
+        core.setFlag('hard', level.hard ?? 0);
+        core.setFlag('__hardColor__', level.color ?? 'red');
     }
-    _startGame_afterStart(callback) {
+    async _startGame_afterStart() {
         core.ui.closePanel();
-        core.changeFloor(core.firstData.floorId, null, core.firstData.hero.loc, null, function () {
-            // 插入一个空事件避免直接回放录像出错
-            core.insertAction([]);
-            if (callback)
-                callback();
-        });
         this._startGame_upload();
+        await core.changeFloor(core.firstData.floorId, null, core.firstData.hero.loc, null);
+        // 插入一个空事件避免直接回放录像出错
+        core.insertAction([]);
+        if (callback)
+            callback();
     }
     _startGame_upload() {
-        // Upload
-        var formData = new FormData();
-        formData.append('type', 'people');
-        formData.append('name', core.firstData.name);
-        formData.append('version', core.firstData.version);
-        formData.append('platform', core.platform.string);
-        formData.append('hard', core.encodeBase64(core.status.hard));
-        formData.append('hardCode', core.getFlag('hard', 0));
-        formData.append('base64', 1);
-
-        core.utils.http("POST", "/games/upload.php", formData);
+        websiteSDK.reportPlay(core.status.hard, core.getFlag('hard', 0));
     }
     ////// 游戏获胜事件 //////
     win(reason, norank, noexit) {
@@ -731,12 +717,19 @@ export class Events {
                 callback();
         });
     }
-    ////// 楼层切换 //////
-    changeFloor(floorId, stair, heroLoc, time, callback) {
-        var info = this._changeFloor_getInfo(floorId, stair, heroLoc, time);
+    /**
+     * 场景切换
+     * @example core.changeFloor('MT0'); // 传送到主塔0层，主角坐标和朝向不变，黑屏时间取用户设置值
+     * @param floorId 传送的目标地图id，可以填':before'和':after'分别表示楼下或楼上
+     * @param stair 传送的位置，可以填':now'（保持不变，可省略）,':symmetry'（中心对称）,':symmetry_x'（左右对称）,':symmetry_y'（上下对称）或图块id（该图块最好在目标层唯一，一般为'downFloor'或'upFloor'）
+     * @param heroLoc 传送的坐标（如果填写了，就会覆盖上述的粗略目标位置）和传送后主角的朝向（不填表示保持不变）
+     * @param time 传送的黑屏时间，单位为毫秒。不填为用户设置值
+     * @param callback 黑屏结束后的回调函数，可选
+     */
+    async changeFloor(floorId: string, stair?: string, heroLoc?: HeroLoc, time?: number, callback?: () => void): void{
+        const info = this._changeFloor_getInfo(floorId, stair, heroLoc, time);
         if (info == null) {
-            if (callback)
-                callback();
+            callback?.();
             return;
         }
         floorId = info.floorId;
@@ -750,12 +743,13 @@ export class Events {
         clearInterval(core.interval.onDownInterval);
         core.interval.onDownInterval = 'tmp';
 
-        this._changeFloor_beforeChange(info, callback);
+        await this._changeFloor_beforeChange(info);
+        callback?.();
     }
-    _changeFloor_getInfo(floorId, stair, heroLoc, time) {
-        floorId = floorId || core.status.floorId;
+    _changeFloor_getInfo(floorId: string, stair: string, heroLoc, time) {
+        floorId ??= core.status.floorId;
         if (floorId == ':before') {
-            var index = core.floorIds.indexOf(core.status.floorId);
+            const index = core.floorIds.indexOf(core.status.floorId);
             if (index > 0)
                 floorId = core.floorIds[index - 1];
             else
@@ -782,18 +776,18 @@ export class Events {
         time /= 20;
 
         return {
-            floorId: floorId,
-            time: time,
-            heroLoc: core.clone(this._changeFloor_getHeroLoc(floorId, stair, heroLoc))
+            floorId,
+            time,
+            heroLoc: cloneDeep(this._changeFloor_getHeroLoc(floorId, stair, heroLoc))
         };
     }
     _changeFloor_getHeroLoc(floorId, stair, heroLoc) {
         if (!heroLoc)
-            heroLoc = core.clone(core.status.hero.loc);
+            heroLoc = cloneDeep(core.status.hero.loc);
         if (stair) {
             // --- 对称
             if (stair == ':now')
-                heroLoc = core.clone(core.status.hero.loc);
+                heroLoc = cloneDeep(core.status.hero.loc);
             else if (stair == ':symmetry') {
                 heroLoc.x = core.bigmap.width - 1 - core.getHeroLoc('x');
                 heroLoc.y = core.bigmap.height - 1 - core.getHeroLoc('y');
@@ -826,18 +820,16 @@ export class Events {
         });
         return heroLoc;
     }
-    _changeFloor_beforeChange(info, callback) {
+    async _changeFloor_beforeChange(info) {
         this._changeFloor_playSound();
         // 需要 setTimeout 执行，不然会出错
-        window.setTimeout(function () {
-            if (info.time == 0)
-                core.events._changeFloor_changing(info, callback);
-
-            else
-                core.showWithAnimate(core.dom.floorMsgGroup, info.time / 2, function () {
-                    core.events._changeFloor_changing(info, callback);
-                });
-        }, 25);
+        await sleep(25);
+        if (info.time > 0) {
+            /**
+             * @todo 楼层过渡动画
+             */
+        }
+        await core.events._changeFloor_changing(info);
     }
     _changeFloor_playSound() {
         // 播放换层音效
@@ -849,7 +841,7 @@ export class Events {
         else
             core.playSound('上下楼');
     }
-    _changeFloor_changing(info, callback) {
+    async _changeFloor_changing(info) {
         this.changingFloor(info.floorId, info.heroLoc);
         // 回归视角
         var __lockViewport__ = flags.__lockViewport__;
@@ -857,22 +849,18 @@ export class Events {
         core.drawHero();
         core.setFlag('__lockViewport__', __lockViewport__);
 
-        if (info.time == 0)
-            this._changeFloor_afterChange(info, callback);
-
-        else
-            core.hideWithAnimate(core.dom.floorMsgGroup, info.time / 4, function () {
-                core.events._changeFloor_afterChange(info, callback);
-            });
+        if (info.time > 0) {
+            /**
+             * @todo 楼层过渡动画
+             */
+        }
+        core.events._changeFloor_afterChange(info);
     }
-    _changeFloor_afterChange(info, callback) {
+    _changeFloor_afterChange(info) {
         if (!info.locked)
             core.unlockControl();
         core.status.replay.animate = false;
         core.events.afterChangeFloor(info.floorId);
-
-        if (callback)
-            callback();
     }
     changingFloor(floorId, heroLoc) {
         this.eventdata.changingFloor(floorId, heroLoc);
@@ -987,8 +975,7 @@ export class Events {
         if (this.actions[type]) {
             try {
                 return core.doFunc(this.actions[type], this, data, x, y, prefix);
-            }
-            catch (e) {
+            } catch (e) {
                 main.log(e);
                 main.log("ERROR in actions[" + type + "]");
             }

@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { clone } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import { core } from "./core";
 
 export interface Enemy {
@@ -50,12 +50,12 @@ export class Enemys {
         }
     }
     getEnemys() {
-        var enemys = clone(this.enemys);
+        var enemys = cloneDeep(this.enemys);
         var enemyInfo = core.getFlag('enemyInfo');
         if (enemyInfo) {
             for (var id in enemyInfo) {
                 for (var name in enemyInfo[id]) {
-                    enemys[id][name] = core.clone(enemyInfo[id][name]);
+                    enemys[id][name] = cloneDeep(enemyInfo[id][name]);
                 }
             }
         }
@@ -534,7 +534,7 @@ export class Enemys {
         if (critical.length > 0)
             critical = critical[0];
 
-        var e = core.clone(enemy);
+        var e = cloneDeep(enemy);
         for (var v in enemyInfo) {
             e[v] = enemyInfo[v];
         }

@@ -26,18 +26,16 @@ export class UI {
      * @param name 
      * @returns 
      */
-    getContextByName(name: string) {
-        var canvas = name;
-        if (typeof name == 'string') {
+    getContextByName(name: string | CanvasRenderingContext2D) {
+        if (typeof name === 'string') {
             if (core.canvas[name])
-                canvas = core.canvas[name];
+                return core.canvas[name];
             else if (core.dymCanvas[name])
-                canvas = core.dymCanvas[name];
+                return core.dymCanvas[name];
+            return null;
+        } else if (name instanceof CanvasRenderingContext2D) {
+            return name;
         }
-        if (canvas && canvas.canvas) {
-            return canvas;
-        }
-        return null;
     }
     _createUIEvent() {
         if (main.mode == 'editor')
@@ -615,9 +613,12 @@ export class UI {
     drawImage(name: CtxRefer,
         image: CanvasImageSource | string,
         x: number, y: number, w: number, h: number, x1: number, y1: number, w1: number, h1: number, angle: number, reverse: boolean): void
+    drawImage(name: CtxRefer,
+        image: CanvasImageSource | string,
+        x: number, y: number, w?: number, h?: number, x1?: number, y1?: number, w1?: number, h1?: number, angle?: number, reverse?: boolean): void
     {
         // 检测文件名以 :x, :y, :o 结尾，表示左右翻转，上下翻转和中心翻转
-        var ctx = this.getContextByName(name);
+        const ctx = this.getContextByName(name);
         if (!ctx) {
             console.error("[drawImage] missing ctx");
             return;
@@ -732,14 +733,14 @@ export class UI {
         core.interval.onDownInterval = 'tmp';
     }
     clearUI() {
-        core.status.boxAnimateObjs = [];
-        core.deleteCanvas("_selector");
-        main.dom.next.style.display = 'none';
-        main.dom.next.style.opacity = 1;
-        core.clearMap('ui');
-        core.setAlpha('ui', 1);
-        core.setOpacity('ui', 1);
-        core.deleteCanvas('ui2');
+        // core.status.boxAnimateObjs = [];
+        // core.deleteCanvas("_selector");
+        // main.dom.next.style.display = 'none';
+        // main.dom.next.style.opacity = 1;
+        // core.clearMap('ui');
+        // core.setAlpha('ui', 1);
+        // core.setOpacity('ui', 1);
+        // core.deleteCanvas('ui2');
     }
 
     /** 
@@ -1487,9 +1488,15 @@ export class UI {
             }
         }, time / 20);
     }
-    ////// 绘制一个对话框 //////
-    drawTextBox(content, config) {
-        config = config || {};
+    /**
+     * 绘制一个对话框
+     * @param content 
+     * @param config 
+     * @returns 
+     */
+    drawTextBox(content: string, config = {}) {
+        console.log(content, config);
+        return;
 
         this.clearUI();
         content = core.replaceText(content);

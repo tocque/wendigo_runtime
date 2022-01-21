@@ -35,6 +35,14 @@ export interface HeroData {
     steps: number
 }
 
+export interface GameLevel {
+    name: string,
+    title: string,
+    hard: number,
+    action: MotaEvent,
+    color?: string | RGBArray 
+}
+
 export interface Data {
     /**
      * 资源的列表
@@ -49,7 +57,7 @@ export interface Data {
         sounds: string[],
         fonts: string[],
         nameMap: string[],
-        levelChoose: string[],
+        levelChoose: GameLevel[],
         equipName: string[],
         startBgm: string,
         // styles: Record<string, any>
@@ -58,7 +66,7 @@ export interface Data {
         floorId: string,
         hero: HeroData,
         // startCanvas: any[],
-        startText: MotaEvent[],
+        startText: MotaEvent,
         // shops: any[],
         levelUp: any[],
     }

@@ -3,10 +3,15 @@ import { computed, ref } from '@vue/reactivity';
 import { VIEW_WIDTH, VERSION } from '@/constant';
 import { clamp } from 'lodash-es';
 import { preloader } from '@/modules/preloader';
+import { formatSize } from '@/utils/common';
 
 const { close } = defineProps<{ close: () => void }>();
 
 const { loaded, total } = preloader;
+
+preloader.complete().then(() => {
+    close();
+});
 
 const percentage = computed(() => {
     if (total.value === 0) return 0;
@@ -14,7 +19,7 @@ const percentage = computed(() => {
 });
 const barWidth = computed(() => (percentage.value * VIEW_WIDTH / 100))
 const percentagePosition = computed(() => {
-    return clamp(barWidth.value - 15, 0, VIEW_WIDTH - 30);
+    return clamp(barWidth.value - 15, 0, VIEW_WIDTH - 40);
 });
 </script>
 
@@ -24,7 +29,7 @@ const percentagePosition = computed(() => {
             <span class="version">version: {{ VERSION }}</span>
         </div>
         <div class="slide">
-            <img src="/project/images/fg.png" draggable="false" />
+            <!-- <img src="/project/images/fg.png" draggable="false" /> -->
         </div>
         <div class="bottom">
             <div class="process-bar"
@@ -33,7 +38,7 @@ const percentagePosition = computed(() => {
             <div class="percentage"
                 :style="{ marginLeft: percentagePosition + 'rem' }"
             >{{ percentage }} %</div>
-            <div class="load-status">正在加载（{{ loaded }}mb/{{ total }}mb）</div>
+            <div class="load-status">正在加载（{{ formatSize(loaded) }}/{{ formatSize(total) }}）</div>
         </div>
     </div>
 </template>

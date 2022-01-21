@@ -4,13 +4,20 @@ import { VIEW_WIDTH, VIEW_HEIGHT } from '@/constant';
 import Main from './main/Index.vue';
 import { viewManager } from './view';
 import { resizer } from './resizer';
-
-const { init } = defineProps<{ init: () => void }>();
+import { core } from '@/core/core';
+import { showLoading } from './layers/loading';
 
 onMounted(() => {
     resizer.init();
-    init();
-})
+    core.load().then(() => {
+        core.init();
+    });
+    showLoading().then(async () => {
+        // 游戏逻辑主循环
+        // @ts-ignore
+        window.core = core;
+    });
+});
 
 const STYLE = {
     width: VIEW_WIDTH + 'rem', height: VIEW_HEIGHT + 'rem'
@@ -18,9 +25,9 @@ const STYLE = {
 </script>
 
 <template>
-    <div class="main" :style="STYLE">
+    <div class="game" :style="STYLE">
         <Main></Main>
-        <template  v-for="([layer, closeHandler]) of viewManager.stack">
+        <template v-for="([layer, closeHandler]) of viewManager.stack">
             <component class="layer" :is="layer" :close="closeHandler"></component>
         </template>
     </div>
@@ -33,11 +40,12 @@ const STYLE = {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* visibility: hidden; */
 }
 </style>
 
 <style lang="less" scoped>
-.main {
+.game {
     position: relative;
     user-select: none;
 }

@@ -5,6 +5,7 @@
 
 import { addToClipboard } from "@/modules/client/clipboard";
 import { download } from "@/modules/client/download";
+import { decodeBase64, encodeBase64 } from "@/utils/common";
 import { core } from "./core";
 import { decodeRoute, encodeRoute } from "./route";
 
@@ -861,17 +862,21 @@ export class Utils {
             return false;
         }
     }
-    ////// Base64加密 //////
+    /**
+     * Base64加密
+     * @param str 
+     * @returns 
+     */
     encodeBase64(str: string) {
-        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1) {
-            return String.fromCharCode(parseInt(p1, 16));
-        }));
+        return encodeBase64(str);
     }
-    ////// Base64解密 //////
+    /**
+     * Base64解密
+     * @param str 
+     * @returns 
+     */
     decodeBase64(str: string) {
-        return decodeURIComponent(atob(str).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
+        return decodeBase64(str);
     }
     rand(num: number) {
         var rand = core.getFlag('__rand__', 0);

@@ -92,48 +92,53 @@ class SEPlayer {
     /**
      * 播放音频
      */
-    play(name: string, { volume, pitch }: { volume?: number, pitch?: number }) {
+    play(name: string, { volume, pitch }: { volume?: number, pitch?: number }): [ number, Promise<void> ] {
         if (!this.soundEffects[name]) {
             console.error(`[SEPlayer] 尝试播放不存在的音效 "${ name }"`);
-            return;
+            return [ -1, Promise.resolve() ];
         }
         if (this.muted) {
-            return;
+            return [ -1, Promise.resolve() ];
         }
-        if (this.audioContext) {
-            const source = this.audioContext.createBufferSource();
-            source.buffer = this.soundEffects[name];
-            const gainNode = this.audioContext.createGain();
-            source.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            if (volume) {
-                gainNode.gain.value = volume / 100;
-            }
-            if (pitch) {
-                if (pitch < 30 || pitch > 300) {
-                    console.warn(`[SEPlayer] 音调必须在[30, 300]之间，当前为"${ pitch }"`);
-                }
-                source.playbackRate.setValueAtTime(pitch / 100, 0);
-            }
-            const id = this.seId++;
-            return [ id, new Promise<void>((res) => {
-                source.onended = () => {
-                    this.playingSEs.delete(id);
-                    gainNode.disconnect();
-                    res();
-                }
-                this.playingSEs.set(id, [ name, source ]);
-                if (source.start) source.start(0);
-                // @ts-ignore
-                else if (source.noteOn) source.noteOn(0);
-            }) ];
+        if (!this.audioContext) {
+            /**
+             * @todo 兼容Audio
+             */
+            return [ -1, Promise.resolve() ];
         }
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.soundEffects[name];
+        const gainNode = this.audioContext.createGain();
+        source.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        if (volume) {
+            gainNode.gain.value = volume / 100;
+        }
+        if (pitch) {
+            if (pitch < 30 || pitch > 300) {
+                console.warn(`[SEPlayer] 音调必须在[30, 300]之间，当前为"${ pitch }"`);
+            }
+            source.playbackRate.setValueAtTime(pitch / 100, 0);
+        }
+        const id = this.seId++;
+        return [ id, new Promise<void>((res) => {
+            source.onended = () => {
+                this.playingSEs.delete(id);
+                gainNode.disconnect();
+                res();
+            }
+            this.playingSEs.set(id, [ name, source ]);
+            if (source.start) source.start(0);
+            // @ts-ignore
+            else if (source.noteOn) source.noteOn(0);
+        }) ];
     }
 
     /**
      * 根据id停止音频
      */
     stop(id: number) {
+        if (id === -1) return;
         const item = this.playingSEs.get(id);
         if (!item) {
             console.error(`[SEPlayer] 尝试停止一个未被播放的音效 "${ id }"`);

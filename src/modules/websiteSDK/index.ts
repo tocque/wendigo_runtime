@@ -1,4 +1,5 @@
 import { TOWER_ID, VERSION } from "@/constant";
+import { encodeBase64 } from "@/utils/common";
 import { createFormData } from "@/utils/net";
 import axios from "axios";
 import { platform } from "../client/platform";
@@ -15,9 +16,9 @@ class WebsiteSDK {
             name: TOWER_ID,
             version: VERSION,
             platform: platform.string,
-            hard,
+            hard: encodeBase64(hard),
             hardCode: hardCode.toString(),
-            base64: '0',
+            base64: '1',
         }));
     }
 

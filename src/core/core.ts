@@ -1,7 +1,8 @@
 import { Config } from "@/modules/storage/config";
-import { clone } from "lodash-es";
+import { createCTX } from "@/utils/canvas";
+import { cloneDeep } from "lodash-es";
 import { Control } from "./control";
-import { Data, GameStatus } from "./data";
+import { Data, GameStatus, ResolvedMap } from "./data";
 import { EnemyData, Enemys } from "./enemys";
 import { Events } from "./events";
 import { Icons, IconData } from "./icons";
@@ -99,9 +100,9 @@ class Core {
         'heroCenter': { 'px': null, 'py': null },
 
         // 当前地图
-        'floorId': null,
+        'floorId': null as any as string,
         'thisMap': null,
-        'maps': null,
+        'maps': null as any as Record<string, ResolvedMap>,
         'bgmaps': {},
         'fgmaps': {},
         'mapBlockObjs': {},
@@ -219,8 +220,9 @@ class Core {
      * @example core.floors[core.status.floorId].events // 获得本楼层的所有自定义事件
      */
     floors: Record<string, Floor> = {};
+    floorIds: string[] = [];
 
-    canvas: Record<string, CanvasRenderingContext2D> = {};
+    canvas: Record<string, CanvasRenderingContext2D>;
 
     nameMap: Record<string, string> = {};
 
@@ -239,12 +241,37 @@ class Core {
         floorChangeTime: 500,
     });
 
-    /////////// 系统事件相关 ///////////
-
+    constructor() {
+        const CANVAS = [
+            { name: "bg", zIndex: 10 },
+            { name: "event", zIndex: 30 },
+            { name: "event2", zIndex: 50 },
+            { name: "fg", zIndex: 60 },
+            { name: "damage", zIndex: 65 },
+            { name: "animate", zIndex: 70 },
+            { name: "curtain", zIndex: 125 },
+        ];
+        this.canvas = {};
+        for (const { name, zIndex } of CANVAS) {
+            const ctx = createCTX();
+            const canvas = ctx.canvas;
+            canvas.style.position = "absolute";
+            canvas.style.zIndex = zIndex.toString();
+            canvas.width = this.__PIXELS__;
+            canvas.height = this.__PIXELS__;
+            this.canvas[name] = ctx;
+        }
+    }
 
     async load() {
         await core.loader.loadData();
         await core.loader.addPreloadTask();
+    }
+
+    mountCanvas(mountPoint: HTMLElement) {
+        Object.values(core.canvas).forEach((ctx) => {
+            mountPoint.appendChild(ctx.canvas);
+        })
     }
 
     /**
@@ -255,19 +282,15 @@ class Core {
         this._init_others();
         // this._init_plugins();
 
-        // 初始化画布
-        for (var name in core.canvas) {
-            core.canvas[name].canvas.width = core.__PIXELS__;
-            core.canvas[name].canvas.height = core.__PIXELS__;
-        }
-
-        // core._afterLoadResources(callback);
+        // 初始化地图
+        core.initStatus.maps = core.maps._initMaps();
+        core.control._setRequestAnimationFrame();
     }
 
     private _init_flags() {
-        core.flags = clone(core.data.flags);
-        core.values = clone(core.data.values);
-        core.firstData = clone(core.data.firstData);
+        core.flags = cloneDeep(core.data.flags);
+        core.values = cloneDeep(core.data.values);
+        core.firstData = cloneDeep(core.data.firstData);
         this._init_sys_flags();
         
         // 让你总是拼错！——拼错了就爬！
@@ -314,6 +337,26 @@ class Core {
         core.values.floorChangeTime = core.userConfig.get('floorChangeTime');
         // core.flags.enableHDCanvas = core.getLocalStorage('enableHDCanvas', !core.platform.isIOS);
     }
+
+    private playPromise = Promise.resolve();
+    private _playPromiseHandler = () => {};
+
+    async startPlay() {
+        this.playPromise = new Promise((res) => {
+            this._playPromiseHandler = res;
+        })
+        return this.waitFinish();
+    }
+
+    async waitFinish() {
+        return this.playPromise;
+    }
+
+    finishPlay() {
+        this._playPromiseHandler();
+        this.playPromise = Promise.resolve();
+        this._playPromiseHandler = () => {};
+    }
 }
 
 type Forward<T> = Omit<{
@@ -331,22 +374,22 @@ type core = Core
     & Forward<UI> & { ui: UI }
     & Forward<Utils> & { utils: Utils }
     
-    function createCore(): core {
-        const core = new Core();
-    const forward = (libname: string, lib: Object) => {
+function createCore(): core {
+    const core = new Core();
+    const forward = (libname: string, libConstructor: { new(): any }) => {
+        const lib = new libConstructor();
         // @ts-ignore
-        raw[libname] = lib;
+        core[libname] = lib;
         const prototype = Object.getPrototypeOf(lib);
         Reflect.ownKeys(prototype).forEach((key) => {
             if (typeof key !== "string") return;
             if (key === "constructor" || key === "init" || key === "load") return;
             if (key.charAt(0) === '_') return;
             if (!(Object.getOwnPropertyDescriptor(prototype, key)?.value instanceof Function)) return;
-            // @ts-ignore
-            console.log(a, key, Object.getOwnPropertyDescriptor(prototype, key), a[key]);
-            // @ts-ignore
-            const parameterInfo = /^\s*function\s*[\w_$]*\(([\w_,$\s]*)\)\s*\{/.exec(a[key].toString());
-            const parameters = (parameterInfo == null ? "" : parameterInfo[1]).replace(/\s*/g, '').replace(/,/g, ', ');
+            console.log(`[createCore] 转发${ libname }.${ key }`);
+
+            const parameterInfo = /^\s*(function)?\s*[\w_$]*\(([\w_,$\s]*)\)\s*\{/.exec(prototype[key].toString());
+            const parameters = (parameterInfo == null ? "" : parameterInfo[2]).replace(/\s*/g, '').replace(/,/g, ', ');
             eval(`core.${ key } = function (${ parameters }) {\n\treturn core.${ libname }.${ key }(${ parameters });\n}`);
         });
     }
@@ -364,3 +407,10 @@ type core = Core
 }
 
 export const core = createCore();
+
+/**
+ * @todo 粒度更细的热重载
+ */
+if (import.meta.hot) {
+    import.meta.hot.decline();
+}

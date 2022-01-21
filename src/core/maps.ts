@@ -210,15 +210,20 @@ export class Maps {
             }
         }
     }
-    ////// 从ID获得数字 //////
-    getNumberById(id) {
+    /**
+     * 从ID获得数字
+     * @param id 
+     * @returns 
+     */
+    getNumberById(id: string): number {
         id = this.getIdOfThis(id);
         core.status.id2number = core.status.id2number || {};
-        if (core.status.id2number[id] != null)
-            return core.status.id2number[id];
-        return core.status.id2number[id] = this._getNumberById(id);
+        if (core.status.id2number[id] == null) {
+            core.status.id2number[id] = this._getNumberById(id);
+        }
+        return core.status.id2number[id];
     }
-    _getNumberById(id) {
+    _getNumberById(id: string) {
         for (var number in this.blocksInfo) {
             if ((this.blocksInfo[number] || {}).id == id)
                 return parseInt(number) || 0;
@@ -235,13 +240,13 @@ export class Maps {
             return 17;
         return 0;
     }
-    getBlockByNumber(number) {
+    getBlockByNumber(number: number) {
         core.status.number2Block = core.status.number2Block || {};
         if (core.status.number2Block[number] != null)
             return core.status.number2Block[number];
         return core.status.number2Block[number] = this.initBlock(null, null, number, true);
     }
-    getBlockById(id) {
+    getBlockById(id: string) {
         return this.getBlockByNumber(this.getNumberById(id));
     }
     /** 获得当前事件点的ID */
@@ -254,8 +259,16 @@ export class Maps {
             return id;
         return core.getBlockId(core.status.event.data.x, core.status.event.data.y) || id;
     }
-    ////// 数字和ID的对应关系 //////
-    initBlock(x, y, id, addInfo, eventFloor) {
+    /**
+     * 数字和ID的对应关系
+     * @param x 
+     * @param y 
+     * @param id 
+     * @param addInfo 
+     * @param eventFloor 
+     * @returns 
+     */
+    initBlock(x: number, y: number, id: string, addInfo, eventFloor) {
         var disable = null;
         var opacity = null;
         var filter = null;
@@ -584,8 +597,12 @@ export class Maps {
         }
         return mapArr;
     }
-    ////// 将当前地图重新变成数字，以便于存档 //////
-    saveMap(floorId) {
+    /**
+     * 将当前地图重新变成数字，以便于存档
+     * @param floorId 
+     * @returns 
+     */
+    saveMap(floorId: string) {
         var maps = core.status.maps;
         if (!floorId) {
             var map = {};
@@ -635,8 +652,12 @@ export class Maps {
         }
         return this.loadFloor(floorId, data[floorId]);
     }
-    ////// 更改地图画布的尺寸
-    resizeMap(floorId) {
+    /**
+     * 更改地图画布的尺寸
+     * @param floorId 
+     * @returns 
+     */
+    resizeMap(floorId: string) {
         floorId = floorId || core.status.floorId;
         if (!floorId)
             return;
@@ -1813,19 +1834,20 @@ export class Maps {
     }
     ////// 为autotile判定边界 ////// 
     _makeAutotileEdges() {
-        var autotileIds = Object.keys(core.material.images.autotile);
+        const autotileIds = Object.keys(core.material.images.autotile);
         core.material.autotileEdges = {};
 
-        var canvas = document.createElement("canvas"), ctx = canvas.getContext('2d');
+        const ctx = createCTX();
+        const canvas = ctx.canvas;
         canvas.width = canvas.height = 32;
         ctx.mozImageSmoothingEnabled = false;
         ctx.webkitImageSmoothingEnabled = false;
         ctx.msImageSmoothingEnabled = false;
         ctx.imageSmoothingEnabled = false;
 
-        var first = {}, second = {};
-        autotileIds.forEach(function (t) {
-            var n = core.maps.getNumberById(t);
+        const first = {}, second = {};
+        autotileIds.forEach((t) => {
+            const n = core.maps.getNumberById(t);
             core.clearMap(ctx, 0, 0, 32, 32);
             core.drawImage(ctx, core.material.images.autotile[t], 0, 0, 32, 32, 0, 0, 32, 32);
             first[n] = canvas.toDataURL("image/png");
