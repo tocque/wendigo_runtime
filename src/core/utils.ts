@@ -892,9 +892,9 @@ export class Utils {
         num = num || 2147483648;
         num = Math.abs(num);
 
-        var value;
+        let value = 0;
         if (core.isReplaying()) {
-            var action = core.status.replay.toReplay.shift();
+            const action = core.status.replay.toReplay.shift()!;
             if (action.indexOf("random:") == 0) {
                 value = parseInt(action.substring(7));
                 if (isNaN(value) || value >= num || value < 0) {
@@ -925,9 +925,9 @@ export class Utils {
         _rand += _rand < 0 ? 2147483647 : 0;
         return _rand;
     }
-    ////// 读取一个本地文件内容 //////
     /**
      * 尝试请求读取一个本地文件内容 [异步]
+     * @deprecated
      * @param success 成功后的回调
      * @param error 失败后的回调
      * @param accept 允许的文件后缀名
@@ -935,57 +935,12 @@ export class Utils {
      */
     readFile(success: () => void, error: () => void, accept?: string, readType?: boolean) {
 
-        // core.platform.successCallback = success;
-        // core.platform.errorCallback = error;
-
-        // // @ts-ignore
-        // if (window.jsinterface) {
-        //     // @ts-ignore
-        //     window.jsinterface.readFile();
-        //     return;
-        // }
-
-        // // step 0: 不为http/https，直接不支持
-        // if (!core.platform.isOnline) {
-        //     alert("离线状态下不支持文件读取！");
-        //     if (error)
-        //         error();
-        //     return;
-        // }
-
-        // // Step 1: 如果不支持FileReader，直接不支持
-        // if (core.platform.fileReader == null) {
-        //     alert("当前浏览器不支持FileReader！");
-        //     if (error)
-        //         error();
-        //     return;
-        // }
-
-        // if (core.platform.fileInput == null) {
-        //     core.platform.fileInput = document.createElement("input");
-        //     core.platform.fileInput.style.opacity = 0;
-        //     core.platform.fileInput.type = 'file';
-        //     core.platform.fileInput.onchange = function () {
-        //         var files = core.platform.fileInput.files;
-        //         if (files.length == 0) {
-        //             if (core.platform.errorCallback)
-        //                 core.platform.errorCallback();
-        //             return;
-        //         }
-        //         if (!readType)
-        //             core.platform.fileReader.readAsText(core.platform.fileInput.files[0]);
-        //         else
-        //             core.platform.fileReader.readAsDataURL(core.platform.fileInput.files[0]);
-        //         core.platform.fileInput.value = '';
-        //     };
-        // }
-        // core.platform.fileInput.value = '';
-        // if (accept)
-        //     core.platform.fileInput.accept = accept;
-
-        // core.platform.fileInput.click();
     }
-    ////// 读取文件完毕 //////
+    /**
+     * 读取文件完毕
+     * @deprecated
+     * @param content 
+     */
     readFileContent(content: string) {
         // var obj = null;
         // if (content.slice(0, 4) === 'data') {
