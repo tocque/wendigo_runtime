@@ -176,7 +176,7 @@ export interface GameStatus {
         replaying: boolean
         pausing: boolean
         /** 正在某段动画中 */animate: boolean
-        toReplay: []
+        toReplay: string[]
         totalList: []
         speed: number
         steps: number

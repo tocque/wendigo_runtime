@@ -361,7 +361,7 @@ class Core {
 
 type Forward<T> = Omit<{
     [ K in keyof T as T[K] extends Function ? K : never ]: T[K]
-}, "init">;
+}, "init" | "load">
 
 type core = Core
     & Forward<Control> & { control: Control }
@@ -374,7 +374,7 @@ type core = Core
     & Forward<UI> & { ui: UI }
     & Forward<Utils> & { utils: Utils }
     
-function createCore(): core {
+function createCore(...libs: any[]): core  {
     const core = new Core();
     const forward = (libname: string, libConstructor: { new(): any }) => {
         const lib = new libConstructor();
@@ -389,24 +389,28 @@ function createCore(): core {
             console.log(`[createCore] 转发${ libname }.${ key }`);
 
             const parameterInfo = /^\s*(function)?\s*[\w_$]*\(([\w_,$\s]*)\)\s*\{/.exec(prototype[key].toString());
-            const parameters = (parameterInfo == null ? "" : parameterInfo[2]).replace(/\s*/g, '').replace(/,/g, ', ');
+            const parameters = (parameterInfo === null ? "" : parameterInfo[2]).replace(/\s*/g, '').replace(/,/g, ', ');
             eval(`core.${ key } = function (${ parameters }) {\n\treturn core.${ libname }.${ key }(${ parameters });\n}`);
         });
     }
-    forward("control", Control);
-    forward("enemys", Enemys);
-    forward("events", Events);
-    forward("icons", Icons);
-    forward("items", Items);
-    forward("loader", Loader);
-    forward("maps", Maps);
-    forward("ui", UI);
-    forward("utils", Utils);
+    libs.forEach((lib) => {
+        forward(lib.name, lib);
+    })
     // @ts-ignore
     return core;
 }
 
-export const core = createCore();
+export const core = createCore(
+    Control,
+    Enemys,
+    Events,
+    Icons,
+    Items,
+    Loader,
+    Maps,
+    UI,
+    Utils,
+);
 
 /**
  * @todo 粒度更细的热重载

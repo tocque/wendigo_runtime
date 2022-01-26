@@ -11,7 +11,14 @@ import { resizer } from "@/view/resizer";
 import { core } from "./core";
 
 export interface ControlMethods {
-    
+    saveData: () => any
+    loadData: (data: any, callback: () => void) => void
+    getStatusLabel: (name: string) => string
+    triggerDebuff: (action: 'get' | 'remove', type: string | string[]) => void
+    updateCheckBlock: (floorId?: string) => void
+    moveOneStep: (callback: () => void) => void
+    moveDirectly: (x: number, y: number, ignoreSteps: boolean) => void
+    parallelDo: (timestamp: number) => void
 }
 
 export interface RenderFrameFunc {
@@ -150,8 +157,8 @@ export class Control {
         }
     }
     _animationFrame_autoSave(timestamp: number) {
-        // if (timestamp - core.saves.autosave.time <= 5000)
-        //     return;
+        if (timestamp - core.saves.autosave.time <= 5000)
+            return;
         // core.control.checkAutosave();
         // core.saves.autosave.time = timestamp;
     }
