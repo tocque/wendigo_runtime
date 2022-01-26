@@ -13,8 +13,8 @@ class ViewManager {
      * 为了保证UI栈的正确性，当一个组件不在栈顶时，会将其上方的所有组件一并弹出
      * @param component UI的vue根组件
      */
-    async push(component: Component) {
-        const value = await new Promise<any>((res) => {
+    async push<T = any>(component: Component) {
+        const value = await new Promise<T>((res) => {
             this.stack.push(markRaw([component, res]));
         });
         while (true) {
