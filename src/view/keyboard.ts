@@ -1,3 +1,4 @@
+import { HookContext, HookContextProxy } from "@/utils/context";
 import { computeKeybinding } from "@/utils/keybinding";
 import { isEmpty, last } from "lodash-es";
     
@@ -6,18 +7,11 @@ export type KeyBinding = number;
 export namespace Keyboard {
 
     type EventType = "keydown" | "keypress" | "keyup";
-    
-    export interface KeyActionContext {
-        count: number,
-        currentTimeStamp: number,
-        lastTimeStamp: number,
-        [ key: string ]: any,
-    }
 
-    export type ProxyAction = (context: KeyActionContext, e: KeyboardEvent) => (boolean | void);
+    export type ProxyAction = (context: HookContextProxy, e: KeyboardEvent) => (boolean | void);
     
     export type ProxyRule = [
-        keyBinding: KeyBinding,
+        keyBinding: KeyBinding | KeyBinding[],
         action: { trigger?: ProxyAction, finish?: ProxyAction },
         condition?: () => boolean,
     ];
@@ -33,7 +27,7 @@ export namespace Keyboard {
             keyup: {} as ActionMap,
         }
     
-        contextMap = new Map<number, KeyActionContext>();
+        contextMap = new Map<number, HookContext>();
         
         /**
          * 键盘代理，用于监听键盘代理事件
@@ -48,10 +42,12 @@ export namespace Keyboard {
         emit(type: EventType, e: KeyboardEvent) {
             const keyBinding = computeKeybinding(e);
             const actions = this.eventMap[type][keyBinding];
-            if (!actions) return;
-            for (const action of actions) {
-                if (!action(e)) {
-                    break;
+            // console.log(type, e.key, actions);
+            if (actions) {
+                for (const action of actions) {
+                    if (!action(e)) {
+                        break;
+                    }
                 }
             }
             // 放开键时，要销毁现有的上下文
@@ -77,31 +73,37 @@ export namespace Keyboard {
             const id = this.id++;
             const getContext = () => {
                 if (!this.contextMap.has(id)) {
-                    this.contextMap.set(id, {
-                        count: 0, currentTimeStamp: 0, lastTimeStamp: 0,
-                    });
+                    this.contextMap.set(id, new HookContext);
                 }
                 return this.contextMap.get(id)!;
             }
-            const updateContext = (context: KeyActionContext) => {
-                context.count++;
-                context.lastTimeStamp = context.currentTimeStamp;
-                context.currentTimeStamp = Date.now();
-                return context;
-            }
             if (trigger) {
-                this.addAction("keydown", keyBinding, (e) => {
-                    if (condition && !condition()) return true;
-                    const context = getContext();
-                    return trigger(updateContext(context), e) ?? false;
-                });
+                const addTriggerAction = (keyBinding: number) => {
+                    this.addAction("keydown", keyBinding, (e) => {
+                        if (condition && !condition()) return true;
+                        const context = getContext();
+                        context.reset();
+                        return trigger(context, e) ?? false;
+                    });
+                };
+                if (!Array.isArray(keyBinding)) addTriggerAction(keyBinding);
+                else {
+                    keyBinding.forEach((keyBinding) => addTriggerAction(keyBinding));
+                }
             }
             if (finish) {
-                this.addAction("keydown", keyBinding, (e) => {
-                    if (condition && !condition()) return true;
-                    const context = getContext();
-                    return finish(updateContext(context), e) ?? false;
-                });
+                const addFinishAction = (keyBinding: number) => {
+                    this.addAction("keydown", keyBinding, (e) => {
+                        if (condition && !condition()) return true;
+                        const context = getContext();
+                        context.reset();
+                        return finish(context, e) ?? false;
+                    });
+                };
+                if (!Array.isArray(keyBinding)) addFinishAction(keyBinding);
+                else {
+                    keyBinding.forEach((keyBinding) => addFinishAction(keyBinding));
+                }
             }
         }
     
@@ -113,16 +115,44 @@ export namespace Keyboard {
         }
     }
 
+    export const useTimestamp = (context: HookContextProxy) => {
+        const [ lastTimestamp, setLastTimestamp ] = context.use(0);
+        const currentTimestamp = Date.now();
+        const delta = currentTimestamp - lastTimestamp;
+        const update = () => {
+            setLastTimestamp(currentTimestamp);
+        }
+        return [
+            { lastTimestamp, currentTimestamp, delta }, { setLastTimestamp, update }
+        ] as const;
+    }
+
+    /**
+     * 生成长按无效的键盘代理规则
+     * @param action 
+     * @returns 
+     */
     export function noLongPress(action: ProxyAction): ProxyRule[1] {
         return { trigger: (context, e) => {
-            if (context.count !== 1) return;
+            const [ isFirst, setIsFirst ] = context.use(true);
+            console.log(isFirst);
+            if (!isFirst) return;
+            setIsFirst(false);
             action(context, e);
         } };
     }
-
+    
+    /**
+     * 生成长按节流的键盘代理规则
+     * @param action 
+     * @param time 节流的频率，即两次触发间的最短间隔 
+     * @returns 
+     */
     export function throttleLongPress(action: ProxyAction, time: number): ProxyRule[1] {
         return { trigger: (context, e) => {
-            if (context.currentTimeStamp - context.lastTimeStamp < time) return;
+            const [ { delta }, { update } ] = useTimestamp(context);
+            if (delta < time) return;
+            update();
             action(context, e);
         } };
     }
