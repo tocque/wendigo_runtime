@@ -13,7 +13,7 @@ class FilePicker {
         this.input.type = 'file';
     }
 
-    private async readFile(accept: string, transformer: (blob: Blob) => any) {
+    private async readFile(accept: string, transformer: (fileReader: FileReader, blob: Blob) => any) {
         // @ts-ignore
         if (window.jsinterface) {
             // @ts-ignore
@@ -57,7 +57,7 @@ class FilePicker {
         });
         return new Promise<string>((res, rej) => {
             if (!this.fileReader) throw new Error();
-            this.fileReader.readAsText(file);
+            transformer(this.fileReader, file);
             this.fileReader.onload = (e) => {
                 res(this.fileReader!.result as string)
             };
@@ -67,15 +67,25 @@ class FilePicker {
         });
     }
 
+    /**
+     * 读取一个文本文件
+     * @param accept 允许的文件类型 https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/Input/file#attr-accept
+     * @returns 
+     */
     async readText(accept: string) {
-        return this.readFile(accept, (file: Blob) => {
-            this.fileReader!.readAsText(file);
+        return this.readFile(accept, (fileReader, file) => {
+            fileReader.readAsText(file);
         });
     }
 
+    /**
+     * 以DataURL形式读取一个文件
+     * @param accept 允许的文件类型 https://developer.mozilla.org/zh-CN/docs/Web/HTML/Element/Input/file#attr-accept
+     * @returns 
+     */
     async readDataURL(accept: string) {
-        return this.readFile(accept, (file: Blob) => {
-            this.fileReader!.readAsDataURL(file);
+        return this.readFile(accept, (fileReader, file) => {
+            fileReader.readAsDataURL(file);
         });
     }
 }
