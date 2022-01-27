@@ -374,7 +374,7 @@ type core = Core
     & Forward<UI> & { ui: UI }
     & Forward<Utils> & { utils: Utils }
     
-function createCore(...libs: any[]): core  {
+function createCore(...libs: { new(): any }[]): core  {
     const core = new Core();
     const forward = (libname: string, libConstructor: { new(): any }) => {
         const lib = new libConstructor();
@@ -394,7 +394,7 @@ function createCore(...libs: any[]): core  {
         });
     }
     libs.forEach((lib) => {
-        forward(lib.name, lib);
+        forward(lib.name.toLowerCase(), lib);
     })
     // @ts-ignore
     return core;
