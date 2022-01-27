@@ -106,9 +106,6 @@ export class Loader {
         const fetchString = Object.entries(guidMap)
             .map(([ key, guid ]) => `${ key }: ${key}_${ guid }`)
             .join(",");
-        console.log(`
-            ({ ${ fetchString } })
-        `);
         const puredata = eval(`
             ${ dataString };
             ({ ${ fetchString } })
