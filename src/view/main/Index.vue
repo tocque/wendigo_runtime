@@ -18,10 +18,12 @@ onMounted(() => {
     position: absolute;
     width: 100%;
     height: 100%;
+    z-index: 0;
 }
 .gameDraw {
     position: absolute;
     top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
     margin: auto;
