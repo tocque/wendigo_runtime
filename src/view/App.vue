@@ -6,17 +6,32 @@ import { viewManager } from './view';
 import { resizer } from './resizer';
 import { core } from '@/core/core';
 import { showLoading } from './layers/loading';
+import { showTitle, TitleOperator } from './layers/title';
 
-onMounted(() => {
+onMounted(async () => {
+    if (import.meta.env.DEV) {
+        // @ts-ignore
+        window.core = core;
+    }
     resizer.init();
     core.load().then(() => {
         core.init();
     });
-    showLoading().then(async () => {
-        // 游戏逻辑主循环
-        // @ts-ignore
-        window.core = core;
-    });
+    await showLoading();
+    // 游戏逻辑主循环
+    while (true) {
+        const [ op, payload ] = await showTitle();
+        if (op === TitleOperator.START_NEW) {
+            await core.startNewGame(payload);
+        } else if (op === TitleOperator.START_FROM_SAVE) {
+
+        } else if (op === TitleOperator.START_FROM_REPLAY) {
+            const { hard, seed, route } = payload;
+            await core.startFromReplay(hard, seed, route);
+        } else {
+            throw new Error();
+        }
+    }
 });
 
 const STYLE = {
@@ -47,11 +62,14 @@ const STYLE = {
 <style lang="less" scoped>
 .game {
     position: relative;
+    overflow: hidden;
     user-select: none;
 }
 .layer {
     position: absolute;
     width: 100%;
     height: 100%;
+
+    overflow: hidden;
 }
 </style>
