@@ -47,7 +47,7 @@ class BGMPlayer {
 
     private currentBGM: BGMStatus | null = null;
 
-    private _config = new Config({
+    private _config = new Config("bgm", {
         muted: false,
         volume: 70
     });

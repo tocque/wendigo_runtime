@@ -230,7 +230,7 @@ class Core {
 
     values: Record<string, number> = {};
 
-    userConfig = new Config({
+    userConfig = new Config("user", {
         enemyDamage: true,
         critical: true,
         extraDamage: true,
@@ -377,6 +377,7 @@ type core = Core
 function createCore(...libs: { new(): any }[]): core  {
     const core = new Core();
     const forward = (libname: string, libConstructor: { new(): any }) => {
+        console.groupCollapsed(`[createCore] 转发${ libname }`);
         const lib = new libConstructor();
         // @ts-ignore
         core[libname] = lib;
@@ -386,12 +387,13 @@ function createCore(...libs: { new(): any }[]): core  {
             if (key === "constructor" || key === "init" || key === "load") return;
             if (key.charAt(0) === '_') return;
             if (!(Object.getOwnPropertyDescriptor(prototype, key)?.value instanceof Function)) return;
-            console.log(`[createCore] 转发${ libname }.${ key }`);
+            console.log(`${ libname }.${ key }`);
 
             const parameterInfo = /^\s*(function)?\s*[\w_$]*\(([\w_,$\s]*)\)\s*\{/.exec(prototype[key].toString());
             const parameters = (parameterInfo === null ? "" : parameterInfo[2]).replace(/\s*/g, '').replace(/,/g, ', ');
             eval(`core.${ key } = function (${ parameters }) {\n\treturn core.${ libname }.${ key }(${ parameters });\n}`);
         });
+        console.groupEnd();
     }
     libs.forEach((lib) => {
         forward(lib.name.toLowerCase(), lib);

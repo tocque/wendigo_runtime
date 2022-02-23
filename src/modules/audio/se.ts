@@ -5,6 +5,11 @@ import { Config } from "../storage/config";
 // @ts-ignore
 window.AudioContext = window.AudioContext ?? window.webkitAudioContext ?? window.mozAudioContext ?? window.msAudioContext;
 
+export interface SEOption {
+    volume: number
+    pitch: number
+}
+
 class SEPlayer {
 
     private soundEffects: Record<string, AudioBuffer> = {};
@@ -34,7 +39,7 @@ class SEPlayer {
         this.soundEffects[filename] = audioBuffer;
     }
 
-    private _config = new Config({
+    private _config = new Config("se", {
         muted: false,
         volume: 70
     });
@@ -92,7 +97,7 @@ class SEPlayer {
     /**
      * 播放音频
      */
-    play(name: string, { volume, pitch }: { volume?: number, pitch?: number }): [ number, Promise<void> ] {
+    play(name: string, { volume, pitch }: Partial<SEOption> = {}): [ number, Promise<void> ] {
         if (!this.soundEffects[name]) {
             console.error(`[SEPlayer] 尝试播放不存在的音效 "${ name }"`);
             return [ -1, Promise.resolve() ];
