@@ -1,3 +1,4 @@
+import { packToArray } from "@/utils/common";
 import { HookContext, HookContextProxy } from "@/utils/context";
 import { computeKeybinding } from "@/utils/keybinding";
 import { isEmpty, last } from "lodash-es";
@@ -38,18 +39,29 @@ export namespace Keyboard {
                 this.addRule(rule);
             })
         }
+
+        private extendProxy?: Proxy;
+
+        extend(proxy: Proxy) {
+            this.extendProxy = proxy;
+        }
     
         emit(type: EventType, e: KeyboardEvent) {
             const keyBinding = computeKeybinding(e);
             const actions = this.eventMap[type][keyBinding];
             // console.log(type, e.key, actions);
-            if (actions) {
-                for (const action of actions) {
-                    if (!action(e)) {
-                        break;
+            (() => {
+                if (actions) {
+                    for (const action of actions) {
+                        if (!action(e)) {
+                            return;
+                        }
                     }
                 }
-            }
+                if (this.extendProxy) {
+                    this.extendProxy.emit(type, e);
+                }
+            })();
             // 放开键时，要销毁现有的上下文
             if (type === "keyup") {
                 this.contextMap.clear();
@@ -78,32 +90,24 @@ export namespace Keyboard {
                 return this.contextMap.get(id)!;
             }
             if (trigger) {
-                const addTriggerAction = (keyBinding: number) => {
+                packToArray(keyBinding).forEach((keyBinding) => {
                     this.addAction("keydown", keyBinding, (e) => {
                         if (condition && !condition()) return true;
                         const context = getContext();
                         context.reset();
                         return trigger(context, e) ?? false;
                     });
-                };
-                if (!Array.isArray(keyBinding)) addTriggerAction(keyBinding);
-                else {
-                    keyBinding.forEach((keyBinding) => addTriggerAction(keyBinding));
-                }
+                });
             }
             if (finish) {
-                const addFinishAction = (keyBinding: number) => {
-                    this.addAction("keydown", keyBinding, (e) => {
+                packToArray(keyBinding).forEach((keyBinding) => {
+                    this.addAction("keyup", keyBinding, (e) => {
                         if (condition && !condition()) return true;
                         const context = getContext();
                         context.reset();
                         return finish(context, e) ?? false;
                     });
-                };
-                if (!Array.isArray(keyBinding)) addFinishAction(keyBinding);
-                else {
-                    keyBinding.forEach((keyBinding) => addFinishAction(keyBinding));
-                }
+                });
             }
         }
     
@@ -112,6 +116,7 @@ export namespace Keyboard {
          */
         eject() {
             this.contextMap.clear();
+            this.extendProxy = void 0;
         }
     }
 
@@ -132,14 +137,14 @@ export namespace Keyboard {
      * @param action 
      * @returns 
      */
-    export function noLongPress(action: ProxyAction): ProxyRule[1] {
-        return { trigger: (context, e) => {
+    export function noLongPress(action: ProxyAction): ProxyAction {
+        return (context, e) => {
             const [ isFirst, setIsFirst ] = context.use(true);
             console.log(isFirst);
             if (!isFirst) return;
             setIsFirst(false);
             action(context, e);
-        } };
+        };
     }
     
     /**
@@ -148,13 +153,13 @@ export namespace Keyboard {
      * @param time 节流的频率，即两次触发间的最短间隔 
      * @returns 
      */
-    export function throttleLongPress(action: ProxyAction, time: number): ProxyRule[1] {
-        return { trigger: (context, e) => {
+    export function throttleLongPress(action: ProxyAction, time: number): ProxyAction {
+        return (context, e) => {
             const [ { delta }, { update } ] = useTimestamp(context);
             if (delta < time) return;
             update();
             action(context, e);
-        } };
+        };
     }
     
     export class Manager {
@@ -175,10 +180,16 @@ export namespace Keyboard {
         }
 
         private id = 0;
+
+        extend(proxy: Proxy) {
+            proxy.extend(last(this.focusStack)![1]);
+            return this.push(proxy);
+        }
     
         push(proxy: Proxy) {
             const id = this.id++;
             this.focusStack.push([ id, proxy ]);
+            console.log(`[keyboard] push proxy [${ id }] =`, proxy);
             return id;
         }
     
@@ -188,6 +199,7 @@ export namespace Keyboard {
          * @returns 
          */
         pop(id: number) {
+            console.log(`[keyboard] pop proxy [${ id }]`);
             if (id === -1) {
                 this.focusStack.pop();
                 return;
