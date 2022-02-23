@@ -62,7 +62,7 @@ export class Loader {
         this.loadMaterials(MATERIALS.map(e => e));
         this.loadSEs(menifest.sounds);
         this.loadTilesets(menifest.tilesets);
-        await preloader.complete();
+        await preloader.finalize();
     }
 
     private async loadFloor() {
@@ -124,6 +124,7 @@ export class Loader {
         module: string, list: string[], type: 'text' | 'blob',
         dataHandler: TextHandler | BlobHandler, { suffix = "" }: AddTaskOption = {}
     ) {
+        console.log(`[loader] 加载 ${module }/`)
         const dict = Object.fromEntries(list.map(e => [ e + suffix, e ]));
         if (main.useCompress) {
             return preloader.addTask(async (progress, finish) => {
@@ -148,6 +149,7 @@ export class Loader {
                     } else {
                         await (dataHandler as BlobHandler)(filename, data);
                     }
+                    console.debug(`[loader] 加载${ module }/${ filename }`);
                     finish();
                 });
             }));

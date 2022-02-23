@@ -34,11 +34,28 @@ class Preloader {
         return task;
     }
 
+    private completeHandler?: () => void;
+    private completePromise = new Promise<void>((res) => {
+        this.completeHandler = res;
+    });
+
+    /**
+     * 
+     */
+    async finalize() {
+        console.log(`[preloader] finalized, task count = ${ this.tasks.length}`);
+        Promise.all(this.tasks).then(() => {
+            console.log(`[preloader] complete`);
+            this.completeHandler!();
+        })
+        return this.complete();
+    }
+
     /**
      * 
      */
     complete() {
-        return Promise.all(this.tasks);
+        return this.completePromise;
     }    
 }
 
