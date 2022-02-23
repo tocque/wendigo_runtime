@@ -1,3 +1,5 @@
+import { isUndefined } from "lodash-es";
+
 /** 格式化文件大小 */
 export function formatSize(size: number) {
     if (size < 1024)
@@ -25,3 +27,8 @@ export async function sleep(time = 0) {
         setTimeout(() => res(), time);
     })
 }
+
+export function packToArray<T>(e: T | T[]) {
+    if (!Array.isArray(e)) return [ e ];
+    else return e;
+} 
