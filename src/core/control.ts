@@ -1424,8 +1424,12 @@ export class Control {
         core.status.replay.speed = speed;
         core.drawTip("x" + core.status.replay.speed + "倍");
     }
-    ////// 停止播放 //////
-    stopReplay(force) {
+    /**
+     * 停止播放
+     * @param force 
+     * @returns 
+     */
+    stopReplay(force = false) {
         if (!core.isPlaying())
             return;
         if (!core.isReplaying() && !force)

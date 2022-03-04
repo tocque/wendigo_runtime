@@ -35,7 +35,7 @@ export const chapters: [ string, [ string, Component, string? ][] ][] = [
         }) ],
         [ "临界显伤", defineComponent(({ focused }: { focused: boolean }) => {
             return () => (
-                <Switch config={ 1 } focused={ focused }></Switch>
+                <Switch config="critical" focused={ focused }></Switch>
             );
         }) ],
         [ "领域显伤", defineComponent(({ focused }: { focused: boolean }) => {
@@ -62,7 +62,7 @@ export const chapters: [ string, [ string, Component, string? ][] ][] = [
         }) ],
         [ "血瓶绕路", defineComponent(({ focused }: { focused: boolean }) => {
             return () => (
-                <Switch config={ 1 } focused={ focused }></Switch>
+                <Switch config="" focused={ focused }></Switch>
             );
         }) ],
         [ "单击瞬移", defineComponent(({ focused }: { focused: boolean }) => {
@@ -72,7 +72,7 @@ export const chapters: [ string, [ string, Component, string? ][] ][] = [
         }) ],
         [ "左手模式", defineComponent(({ focused }: { focused: boolean }) => {
             return () => (
-                <Switch config={ 1 } focused={ focused }></Switch>
+                <Switch config="leftHandPrefer" focused={ focused }></Switch>
             );
         }) ],
     ] ],

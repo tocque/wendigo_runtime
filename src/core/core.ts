@@ -1,6 +1,7 @@
 import { Config } from "@/modules/storage/config";
 import { createCTX } from "@/utils/canvas";
 import { cloneDeep } from "lodash-es";
+import { Actions } from "./actions";
 import { Control } from "./control";
 import { Data, GameStatus, ResolvedMap } from "./data";
 import { EnemyData, Enemys } from "./enemys";
@@ -271,7 +272,7 @@ class Core {
     mountCanvas(mountPoint: HTMLElement) {
         Object.values(core.canvas).forEach((ctx) => {
             mountPoint.appendChild(ctx.canvas);
-        })
+        });
     }
 
     /**
@@ -364,6 +365,7 @@ type Forward<T> = Omit<{
 }, "init" | "load">
 
 type core = Core
+    & Forward<Actions> & { actions: Actions }
     & Forward<Control> & { control: Control }
     & Forward<Enemys> & { enemys: Enemys }
     & Forward<Events> & { events: Events }
@@ -403,6 +405,7 @@ function createCore(...libs: { new(): any }[]): core  {
 }
 
 export const core = createCore(
+    Actions,
     Control,
     Enemys,
     Events,
